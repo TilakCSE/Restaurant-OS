@@ -1,114 +1,210 @@
-🍽️ Restaurant OS (PC's Kitchen)
 
-Production-grade Restaurant POS & Kitchen Display System (KDS) built specifically for PC's Kitchen.
+# 🍽️ Restaurant OS — PC's Kitchen
 
-This project replaces expensive SaaS subscriptions (like Petpooja/DotPe) with a custom, high-performance Serverless solution. It handles the complete lifecycle of a restaurant order: from QR scan to Kitchen notification to Bill generation.
+[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://restaurant-os-eosin.vercel.app/) [![Vercel](https://img.shields.io/badge/deploy-vercel-black?logo=vercel)](https://vercel.com/) [![React](https://img.shields.io/badge/react-^18.0-blue?logo=react)](https://reactjs.org/) [![Tailwind](https://img.shields.io/badge/tailwind-css-teal?logo=tailwind-css)](https://tailwindcss.com/) [![Firebase](https://img.shields.io/badge/firebase-firestore-yellow?logo=firebase)](https://firebase.google.com/) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-🌐 Live Demo
+> Production-grade Restaurant POS & Kitchen Display System (KDS) tailored for **PC's Kitchen** — lightweight, serverless, and fast. Replace expensive SaaS subscriptions (Petpooja/DotPe) with a custom solution that handles QR self-ordering → kitchen workflow → billing.
 
-Production URL: https://restaurant-os-eosin.vercel.app/
+---
 
-How to Test:
+## 🔗 Live Demo
+**Production URL:** https://restaurant-os-eosin.vercel.app/
 
-Customer Mode (Table 1): Add /?table=1 to the URL.
+**How to test**
+- Customer (Table 1): `https://restaurant-os-eosin.vercel.app/?table=1`  
+- Parcel/Takeaway: `https://restaurant-os-eosin.vercel.app/?table=PARCEL`  
+- Kitchen/Staff: Open the main link and enter **PIN: `1234`**
 
-Parcel Mode: Add /?table=PARCEL to the URL.
+---
 
-Kitchen/Staff Mode: Open the main link and enter PIN 1234.
+## 📋 Table of Contents
+1. [Key Features](#-key-features)
+2. [Screenshots](#-screenshots)
+3. [Tech Stack](#-tech-stack)
+4. [Local Development](#-local-development)
+5. [Environment Variables](#-environment-variables)
+6. [Firestore Security Rules (example)](#-firestore-security-rules-example)
+7. [Deployment](#-deployment)
+8. [Roadmap](#-roadmap)
+9. [Contributing](#-contributing)
+10. [License & Credits](#-license--credits)
 
-✨ Key Features
+---
 
-📱 Customer Interface (Self-Ordering)
+## ✨ Key Features
 
-Smart QR Logic: The app reads the URL (?table=5) to automatically assign orders to the correct table.
+### Customer Interface (Self-Ordering)
+- ✅ Smart QR / URL logic: `?table=<ID>` assigns table automatically  
+- ✅ Takeaway/Parcel mode with visible PARCEL badge  
+- ✅ AVIF-optimized assets for super-fast menu loading  
+- ✅ Portion variants (Half / Full) + dynamic pricing
 
-Takeaway Mode: Dedicated UI for Parcel orders (Yellow "Takeaway" badge) to ensure correct packing by the kitchen.
+### Kitchen Display System (KDS)
+- ⚡ Real-time sync with **Firestore** (sub-100ms updates)  
+- 🔔 Automatic audio alert (service bell) on new tickets  
+- 🎯 Color-coded/differentiated view for Dine-in vs Parcel  
+- ✔ Ticket lifecycle: `Pending -> Preparing -> Ready/Served`
 
-Performance: Uses next-gen .AVIF image formats for instant menu loading even on slow 4G networks.
+### Staff Dashboard
+- 🧾 Waiter Mode for manual orders (phone/illiterate customers)  
+- 🧮 Live bill grouping (combine initial + extra orders into single table bill)  
+- 🔒 PIN-protected admin (default `1234`)
 
-Variants: Supports Half/Full portion sizing with dynamic price calculation.
+---
 
-👨‍🍳 Kitchen Display System (KDS)
+---
 
-Real-time Sync: Powered by Firebase Firestore. Orders appear instantly (<100ms) without refreshing the page.
+## 🛠️ Tech Stack
 
-Audio Alerts: Plays a Service Bell sound automatically when a new ticket arrives.
+- **Frontend:** React.js + Vite  
+- **Styling:** Tailwind CSS (mobile-first)  
+- **Backend / Realtime DB:** Firebase Firestore  
+- **Hosting / CI:** Vercel  
+- **Icons:** Lucide React  
+- **Assets:** AVIF images for performance
 
-Visual Priority: Distinct visual styles for Dine-in vs Parcel orders.
+---
 
-Workflow: Chefs can mark tickets as "Served/Ready" to remove them from the queue.
+## ⚙️ Local Development
 
-💼 Staff Dashboard
-
-Waiter Mode: Allows staff to take orders manually for illiterate customers or phone orders.
-
-Live Bills: Automatically groups multiple tickets (e.g., initial order + extra roti) into a single Table Total.
-
-Security: PIN-protected (Default: 1234) interface to prevent customers from accessing admin tools.
-
-🛠️ Tech Stack
-
-Frontend: React.js + Vite
-
-Styling: Tailwind CSS (Mobile-First Architecture)
-
-Backend: Google Firebase (Firestore NoSQL Database)
-
-Hosting: Vercel (CI/CD)
-
-Icons: Lucide React
-
-Assets: Optimized AVIF images
-
-⚙️ Local Development Setup
-
-If you want to run this project on your own machine:
-
-Clone the repository
-
-git clone [https://github.com/your-username/restaurant-os.git](https://github.com/your-username/restaurant-os.git)
+### 1. Clone
+```bash
+git clone https://github.com/your-username/restaurant-os.git
 cd restaurant-os
+````
 
+### 2. Install
 
-Install Dependencies
-
+```bash
 npm install
+```
 
+### 3. Setup environment
 
-Setup Environment Variables
-Create a .env file in the root directory and add your Firebase keys (The project uses Vite, so keys must start with VITE_):
+Create `.env` in the project root (Vite requires `VITE_` prefix):
 
+```
 VITE_API_KEY=your_api_key
 VITE_AUTH_DOMAIN=your_project_id.firebaseapp.com
 VITE_PROJECT_ID=your_project_id
 VITE_STORAGE_BUCKET=your_bucket
 VITE_MESSAGING_SENDER_ID=your_sender_id
 VITE_APP_ID=your_app_id
+```
 
+> ⚠️ **Do not commit** `.env` — add it to `.gitignore`.
 
-Run Locally
+### 4. Run local dev server
 
+```bash
 npm run dev
+# open http://localhost:5173 (or printed dev url)
+```
 
+---
 
-🔒 Security Implementation
+## 🔐 Firestore Security Rules (example)
 
-Client-Side: API keys are injected at build time via environment variables.
+> These sample rules illustrate basic protections — adapt to your Firestore data model before deploying.
 
-Database: Firestore Security Rules are configured to:
+```js
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Orders collection
+    match /orders/{orderId} {
+      allow read: if true; // Public read for kitchen/customer UI (limit fields in client)
+      allow create: if request.auth == null || request.auth != null; // allow anonymous ordering
+      allow update: if
+        // Only allow allowed status transitions
+        request.resource.data.keys().hasOnly(['status','items','table','createdAt','updatedAt']) &&
+        isValidStatusTransition(resource.data.status, request.resource.data.status);
+      allow delete: if false; // prevent deletion to maintain audit trail
+    }
 
-Validate data types (prevent garbage data injection).
+    // A helper function (pseudo, replace with explicit checks)
+    function isValidStatusTransition(oldStatus, newStatus) {
+      return (oldStatus == "PENDING" && (newStatus in ["PREPARING","CANCELLED"])) ||
+             (oldStatus == "PREPARING" && (newStatus in ["READY","CANCELLED"])) ||
+             (oldStatus == "READY" && (newStatus == "SERVED"));
+    }
+  }
+}
+```
 
-Prevent deletion of order history (audit trail).
+---
 
-Allow only valid status updates (Pending -> Completed).
+## 📦 Deployment
 
-🔮 Future Roadmap
+* Uses Vercel for deployment (automatic from `main` branch).
+* Ensure Vercel environment variables mirror `.env` keys (prefixed w/ `VITE_`).
+* Firebase rules & indexes should be pushed using Firebase CLI:
 
-[ ] Integration with Razorpay for Online Payments.
+```bash
+npm install -g firebase-tools
+firebase deploy --only firestore,hosting
+```
 
-[ ] Daily Sales Report generation (PDF Download).
+---
 
-[ ] Inventory Management (Auto-deduct stock).
+## 🔮 Roadmap
 
-Built with ❤️ for PC's Kitchen
+* [ ] Razorpay integration for online payments
+* [ ] Daily sales PDF report export
+* [ ] Inventory management (auto stock deduction)
+* [ ] Multi-terminal support (individual chef stations)
+* [ ] Offline-first queue handling & reconciliation
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feat/<feature-name>`
+3. Commit your changes: `git commit -m "feat: add ..."`
+4. Push and create a Pull Request
+
+Please open issues for bugs or feature requests. Add descriptive titles and steps to reproduce.
+
+---
+
+## 🧪 Testing Notes / QA Checklist
+
+* [ ] Verify `?table=<id>` maps correctly to table UI and bills group correctly.
+* [ ] Test Parcel flow: UI shows PARCEL badge & KDS displays packing priority.
+* [ ] Firestore rules: try invalid status transitions — they should fail.
+* [ ] Confirm audio alerts fire on new ticket arrival across devices.
+
+---
+
+## 📄 License & Credits
+
+**License:** MIT — see `LICENSE` file.
+
+**Credits & Thanks**
+
+* Built with ❤️ using React, Tailwind, Firebase, and Vercel.
+* Icons: Lucide React
+* Thanks to PC's Kitchen for the real-world product inspiration.
+
+---
+
+## 📬 Contact
+
+If you want enhancements, help with deployment, or feature collaboration — open an issue or reach me at:
+
+* GitHub: `https://github.com/TilakCSE`
+* Project: `https://restaurant-os-eosin.vercel.app/`
+
+---
+
+## 📌 Example `package.json` scripts (suggested)
+
+```json
+"scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview",
+  "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+  "format": "prettier --write ."
+}
