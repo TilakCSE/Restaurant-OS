@@ -1,77 +1,72 @@
 🍽️ Restaurant OS (PC's Kitchen)
 
-A full-stack, real-time Restaurant Operating System built to eliminate SaaS fees and streamline operations for "PC's Kitchen".
+Production-grade Restaurant POS & Kitchen Display System (KDS) built specifically for PC's Kitchen.
 
-Live Demo: https://restaurant-os-eosin.vercel.app/
+This project replaces expensive SaaS subscriptions (like Petpooja/DotPe) with a custom, high-performance Serverless solution. It handles the complete lifecycle of a restaurant order: from QR scan to Kitchen notification to Bill generation.
 
-(Note: To test ordering, append /?table=1 to the URL)
+🌐 Live Demo
 
-🚀 The Problem
+Production URL: https://restaurant-os-eosin.vercel.app/
 
-Most restaurants pay heavy monthly subscriptions for POS software (Petpooja, DotPe) that is often clunky and requires expensive hardware.
-The Goal: Build a custom, lightweight PWA (Progressive Web App) that runs on existing smartphones and handles the entire "Order -> Kitchen -> Bill" flow with zero latency.
+How to Test:
 
-💡 The Solution
+Customer Mode (Table 1): Add /?table=1 to the URL.
 
-Restaurant OS is a serverless application where:
+Parcel Mode: Add /?table=PARCEL to the URL.
 
-Customers scan a QR code to order (No app download required).
-
-Kitchen Staff receive orders instantly on a tablet/phone (KDS).
-
-Waiters can add items manually for illiterate customers.
-
-** Owners** get real-time sales data and bill totals.
+Kitchen/Staff Mode: Open the main link and enter PIN 1234.
 
 ✨ Key Features
 
-📱 Customer Interface
+📱 Customer Interface (Self-Ordering)
 
-Smart QR Logic: Automatically detects Table No. (e.g., ?table=5) or Parcel Mode.
+Smart QR Logic: The app reads the URL (?table=5) to automatically assign orders to the correct table.
 
-Optimized Menu: Uses next-gen .avif images for lightning-fast loading.
+Takeaway Mode: Dedicated UI for Parcel orders (Yellow "Takeaway" badge) to ensure correct packing by the kitchen.
 
-Variant Logic: Handles Half/Full portion sizing seamlessly.
+Performance: Uses next-gen .AVIF image formats for instant menu loading even on slow 4G networks.
 
-Cart System: Local state management for a snappy experience.
+Variants: Supports Half/Full portion sizing with dynamic price calculation.
 
 👨‍🍳 Kitchen Display System (KDS)
 
-Real-time Sync: Uses Firebase Firestore listeners to flash new orders instantly (<100ms latency).
+Real-time Sync: Powered by Firebase Firestore. Orders appear instantly (<100ms) without refreshing the page.
 
-Audio Alerts: Plays a "Service Bell" sound when a new ticket arrives.
+Audio Alerts: Plays a Service Bell sound automatically when a new ticket arrives.
 
-Visual Tags: Distinct UI for Dining vs. Takeaway/Parcel orders to prevent packing errors.
+Visual Priority: Distinct visual styles for Dine-in vs Parcel orders.
 
-Security: PIN-protected access (Default: 1234) to prevent unauthorized access.
+Workflow: Chefs can mark tickets as "Served/Ready" to remove them from the queue.
 
 💼 Staff Dashboard
 
-Waiter Mode: Manual order entry for walk-ins or phone orders.
+Waiter Mode: Allows staff to take orders manually for illiterate customers or phone orders.
 
-Live Bills: Automatically groups multiple "KOTs" (Kitchen Order Tickets) into a single Table Bill.
+Live Bills: Automatically groups multiple tickets (e.g., initial order + extra roti) into a single Table Total.
 
-Status Tracking: Mark items as "Served" or "Paid" to clear the queue.
+Security: PIN-protected (Default: 1234) interface to prevent customers from accessing admin tools.
 
 🛠️ Tech Stack
 
-Frontend: React.js (Vite)
+Frontend: React.js + Vite
 
-Styling: Tailwind CSS (Mobile-first design)
+Styling: Tailwind CSS (Mobile-First Architecture)
 
-Backend (Serverless): Google Firebase (Firestore Database)
+Backend: Google Firebase (Firestore NoSQL Database)
+
+Hosting: Vercel (CI/CD)
 
 Icons: Lucide React
 
-Deployment: Vercel (CI/CD)
+Assets: Optimized AVIF images
 
-Asset Optimization: AVIF image compression
+⚙️ Local Development Setup
 
-🏗️ Local Setup
+If you want to run this project on your own machine:
 
 Clone the repository
 
-git clone [https://github.com/yourusername/restaurant-os.git](https://github.com/yourusername/restaurant-os.git)
+git clone [https://github.com/your-username/restaurant-os.git](https://github.com/your-username/restaurant-os.git)
 cd restaurant-os
 
 
@@ -80,13 +75,15 @@ Install Dependencies
 npm install
 
 
-Configure Environment Variables
-Create a .env file in the root directory and add your Firebase credentials:
+Setup Environment Variables
+Create a .env file in the root directory and add your Firebase keys (The project uses Vite, so keys must start with VITE_):
 
 VITE_API_KEY=your_api_key
 VITE_AUTH_DOMAIN=your_project_id.firebaseapp.com
 VITE_PROJECT_ID=your_project_id
-# ... add other firebase config keys
+VITE_STORAGE_BUCKET=your_bucket
+VITE_MESSAGING_SENDER_ID=your_sender_id
+VITE_APP_ID=your_app_id
 
 
 Run Locally
@@ -94,24 +91,24 @@ Run Locally
 npm run dev
 
 
-Open http://localhost:5173/?table=1 to test.
+🔒 Security Implementation
 
-🔒 Security
+Client-Side: API keys are injected at build time via environment variables.
 
-Environment Variables: API keys are injected at build time via Vercel, kept out of the codebase.
+Database: Firestore Security Rules are configured to:
 
-Firestore Rules: Database is locked down to prevent deletion of order history and validate incoming data structure.
+Validate data types (prevent garbage data injection).
 
-Staff Auth: Simple PIN-based entry for kitchen operations.
+Prevent deletion of order history (audit trail).
 
-📸 Usage
+Allow only valid status updates (Pending -> Completed).
 
-Customer View
+🔮 Future Roadmap
 
-Kitchen View
+[ ] Integration with Razorpay for Online Payments.
 
-Scan QR -> Select Items -> Place Order
+[ ] Daily Sales Report generation (PDF Download).
 
-Hear Bell -> View Ticket -> Cook -> Serve
+[ ] Inventory Management (Auto-deduct stock).
 
-Built with ❤️ for PC's Kitchen.
+Built with ❤️ for PC's Kitchen
