@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Bell } from 'lucide-react';
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, query, orderBy, serverTimestamp, getDoc } from 'firebase/firestore';
+import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, XCircle } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.VITE_AUTH_DOMAIN,
@@ -18,30 +19,14 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // --- MENU DATA ---
-// Update image extensions to .avif if you used those files
 const MENU_ITEMS = [
   // --- STARTERS ---
-  { 
-    id: 101, category: "Starters", name: "Fish Fry (01 pc)", price: 90, isVeg: false, image: "/dishes/fish-fry.avif" 
-  },
-  { 
-    id: 102, category: "Starters", name: "Egg Boil Fry (2 eggs)", price: 60, isVeg: false, image: "/dishes/egg-fry.avif" 
-  },
-  { 
-    id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, 
-    variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }]
-  },
-  { 
-    id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130,
-    variants: [{ name: "Half", price: 130 }, { name: "Full", price: 220 }]
-  },
-  { 
-    id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" 
-  },
-  { 
-    id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150,
-    variants: [{ name: "Half", price: 150 }, { name: "Full", price: 240 }]
-  },
+  { id: 101, category: "Starters", name: "Fish Fry (01 pc)", price: 90, isVeg: false, image: "/dishes/fish-fry.avif" },
+  { id: 102, category: "Starters", name: "Egg Boil Fry (2 eggs)", price: 60, isVeg: false, image: "/dishes/egg-fry.avif" },
+  { id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
+  { id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, variants: [{ name: "Half", price: 130 }, { name: "Full", price: 220 }] },
+  { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" },
+  { id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, variants: [{ name: "Half", price: 150 }, { name: "Full", price: 240 }] },
 
   // --- EGG SPECIALS ---
   { id: 201, category: "Egg Specials", name: "Omelette (2 Eggs)", price: 70, isVeg: false, image: "/dishes/omelette.avif" },
@@ -51,53 +36,43 @@ const MENU_ITEMS = [
   { id: 206, category: "Egg Specials", name: "Egg Curry", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
 
   // --- MAIN COURSE ---
-  { 
-    id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120,
-    variants: [{ name: "Half", price: 120 }, { name: "Full", price: 220 }]
-  },
-  { 
-    id: 303, category: "Main Course", name: "Sp. Chicken Masala", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160,
-    variants: [{ name: "Half", price: 160 }, { name: "Full", price: 250 }]
-  },
+  { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120 }, { name: "Full", price: 220 }] },
+  { id: 303, category: "Main Course", name: "Sp. Chicken Masala", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, variants: [{ name: "Half", price: 160 }, { name: "Full", price: 250 }] },
   { id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif" },
   { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif" },
   { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif" },
-  { 
-    id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220,
-    variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }]
-  },
-  { 
-    id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260,
-    variants: [{ name: "Half", price: 260 }, { name: "Full", price: 410 }]
-  },
+  { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] },
+  { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, variants: [{ name: "Half", price: 260 }, { name: "Full", price: 410 }] },
 
   // --- BREADS & RICE ---
   { id: 401, category: "Breads & Rice", name: "Roti (Plain)", price: 15, isVeg: true, image: "/dishes/roti.avif" },
   { id: 402, category: "Breads & Rice", name: "Roti (Butter)", price: 20, isVeg: true, image: "/dishes/butter-roti.avif" },
   { id: 403, category: "Breads & Rice", name: "Makai Rotlo", price: 40, isVeg: true, image: "/dishes/rotlo.avif" },
-  { 
-    id: 404, category: "Breads & Rice", name: "Plain Rice", isVeg: true, image: "/dishes/rice.avif", price: 40,
-    variants: [{ name: "Half", price: 40 }, { name: "Full", price: 60 }]
-  },
-  { 
-    id: 406, category: "Breads & Rice", name: "Jeera Rice", isVeg: true, image: "/dishes/jeera-rice.avif", price: 60,
-    variants: [{ name: "Half", price: 60 }, { name: "Full", price: 90 }]
-  },
+  { id: 404, category: "Breads & Rice", name: "Plain Rice", isVeg: true, image: "/dishes/rice.avif", price: 40, variants: [{ name: "Half", price: 40 }, { name: "Full", price: 60 }] },
+  { id: 406, category: "Breads & Rice", name: "Jeera Rice", isVeg: true, image: "/dishes/jeera-rice.avif", price: 60, variants: [{ name: "Half", price: 60 }, { name: "Full", price: 90 }] },
   { id: 408, category: "Breads & Rice", name: "Roasted Papad", price: 10, isVeg: true, image: "/dishes/papad.avif" },
 ];
 
 // --- COMPONENTS ---
 
-const Header = ({ view, setView, cartCount, currentTable, isStaff, logout }) => (
-  <header className="bg-teal-800 text-white p-4 shadow-lg sticky top-0 z-50">
-    <div className="max-w-4xl mx-auto flex justify-between items-center">
+const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, storeSettings }) => (
+  <header className="bg-teal-800 text-white shadow-lg sticky top-0 z-50">
+    {/* RUSH MODE BANNER */}
+    {storeSettings?.rushMode && (
+        <div className="bg-red-600 text-white text-xs md:text-sm font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse">
+            <AlertTriangle size={16} /> 
+            Restaurant is in RUSH MODE. Orders may take longer than usual.
+        </div>
+    )}
+    
+    <div className="p-4 max-w-4xl mx-auto flex justify-between items-center">
       <div className="flex items-center gap-2 cursor-pointer" onClick={() => isStaff ? setView('staff-dashboard') : setView('menu')}>
         <UtensilsCrossed className="h-6 w-6" />
         <div className="flex flex-col">
             <h1 className="font-bold text-lg leading-tight tracking-wide font-serif">PC's Kitchen</h1>
             {currentTable && view === 'menu' && (
-                <span className={`text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded ${currentTable === 'PARCEL' ? 'bg-yellow-400 text-teal-900' : 'text-teal-200'}`}>
-                  {isStaff ? `Staff Mode: ${currentTable}` : (currentTable === 'PARCEL' ? '📦 Takeaway' : `Table ${currentTable}`)}
+                <span className={`text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded ${currentTable.toString().startsWith('PARCEL') ? 'bg-yellow-400 text-teal-900' : 'text-teal-200'}`}>
+                  {isStaff ? `Staff Mode: ${currentTable}` : (currentTable.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${currentTable}`)}
                 </span>
             )}
         </div>
@@ -133,8 +108,7 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout }) => 
   </header>
 );
 
-// --- STAFF DASHBOARD ---
-const StaffDashboard = ({ setView, setCurrentTable }) => {
+const StaffDashboard = ({ setView, setCurrentTable, storeSettings, toggleRushMode }) => {
     const [manualTable, setManualTable] = useState('');
 
     const startManualOrder = () => {
@@ -143,38 +117,59 @@ const StaffDashboard = ({ setView, setCurrentTable }) => {
         setView('menu');
     };
 
+    const startParcelOrder = () => {
+        const uniqueId = `PARCEL-${Math.floor(1000 + Math.random() * 9000)}`;
+        setCurrentTable(uniqueId);
+        setView('menu');
+    }
+
     return (
         <div className="min-h-screen bg-gray-100 p-4">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                 <ChefHat className="text-teal-600" /> Staff Dashboard
             </h2>
 
-            <div className="grid gap-6 max-w-md mx-auto">
-                {/* 1. KITCHEN DISPLAY */}
+            <div className="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200">
+                <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-3">Live Controls</h3>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={toggleRushMode}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition shadow-sm ${storeSettings.rushMode ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-600'}`}
+                    >
+                        <AlertTriangle size={18} /> {storeSettings.rushMode ? 'Rush Mode ON' : 'Rush Mode OFF'}
+                    </button>
+                    <button 
+                        onClick={() => setView('manage-menu')}
+                        className="flex-1 py-3 px-4 rounded-lg font-bold bg-teal-100 text-teal-800 flex items-center justify-center gap-2 hover:bg-teal-200 shadow-sm"
+                    >
+                        <Ban size={18} /> Out of Stock
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid gap-4 max-w-md mx-auto">
                 <button 
                     onClick={() => setView('kitchen')}
                     className="bg-white p-6 rounded-xl shadow-md border-l-4 border-teal-600 flex items-center justify-between group hover:bg-teal-50 transition"
                 >
                     <div className="text-left">
-                        <h3 className="font-bold text-xl text-gray-800">Kitchen Display (KDS)</h3>
-                        <p className="text-sm text-gray-500">View incoming tickets</p>
+                        <h3 className="font-bold text-xl text-gray-800">Kitchen Display</h3>
+                        <p className="text-sm text-gray-500">Live KDS System</p>
                     </div>
-                    <Store className="text-teal-600 group-hover:scale-110 transition" size={32} />
+                    <Store className="text-teal-600" size={32} />
                 </button>
 
-                {/* 2. BILL VIEW */}
                 <button 
                     onClick={() => setView('bills')}
                     className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-600 flex items-center justify-between group hover:bg-blue-50 transition"
                 >
                     <div className="text-left">
-                        <h3 className="font-bold text-xl text-gray-800">Live Bills & Tables</h3>
-                        <p className="text-sm text-gray-500">Calculate total for Tables</p>
+                        <h3 className="font-bold text-xl text-gray-800">Active Bills</h3>
+                        <p className="text-sm text-gray-500">Settle & Clear Tables</p>
                     </div>
-                    <Receipt className="text-blue-600 group-hover:scale-110 transition" size={32} />
+                    <Receipt className="text-blue-600" size={32} />
                 </button>
 
-                {/* 3. MANUAL ORDER */}
                 <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-orange-500">
                     <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
                         <ClipboardList className="text-orange-500" /> Manual Order
@@ -187,18 +182,12 @@ const StaffDashboard = ({ setView, setCurrentTable }) => {
                             value={manualTable}
                             onChange={(e) => setManualTable(e.target.value)}
                         />
-                        <button 
-                            onClick={startManualOrder}
-                            className="bg-orange-600 text-white px-6 rounded-lg font-bold hover:bg-orange-700"
-                        >
-                            GO
-                        </button>
+                        <button onClick={startManualOrder} className="bg-orange-600 text-white px-6 rounded-lg font-bold hover:bg-orange-700">GO</button>
                     </div>
                 </div>
                 
-                 {/* 4. PARCEL */}
                  <button 
-                    onClick={() => { setCurrentTable('PARCEL'); setView('menu'); }}
+                    onClick={startParcelOrder}
                     className="bg-yellow-400 p-4 rounded-xl shadow-md flex items-center justify-center gap-2 font-bold text-teal-900 hover:bg-yellow-500"
                 >
                     <Package /> New Parcel / Takeaway
@@ -208,76 +197,110 @@ const StaffDashboard = ({ setView, setCurrentTable }) => {
     );
 };
 
+// --- STOCK MANAGEMENT VIEW ---
+const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
+    return (
+        <div className="max-w-2xl mx-auto p-4 pb-24">
+            <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full"><ArrowLeft size={20}/></button>
+                <h2 className="text-2xl font-bold text-gray-800">Manage Stock (86 List)</h2>
+            </div>
+            <p className="mb-4 text-sm text-gray-500">Tap items to mark them as Out of Stock.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {MENU_ITEMS.map(item => {
+                    const isUnavailable = storeSettings.unavailable?.includes(item.id);
+                    return (
+                        <div 
+                            key={item.id} 
+                            onClick={() => toggleStock(item.id)}
+                            className={`p-4 rounded-lg border flex justify-between items-center cursor-pointer transition ${isUnavailable ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200'}`}
+                        >
+                            <span className={`font-bold ${isUnavailable ? 'text-red-700 line-through' : 'text-gray-800'}`}>{item.name}</span>
+                            {isUnavailable ? <Ban className="text-red-600" size={20} /> : <CheckCircle className="text-green-400" size={20} />}
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    );
+};
+
 // --- BILL VIEW ---
-const BillView = ({ activeOrders, markOrderPaid }) => {
-    // Logic: Group all separate tickets by Table Number
+const BillView = ({ activeOrders, settleTable }) => {
     const tables = {};
-    
     activeOrders.forEach(order => {
         const table = order.tableNo;
-        if (!tables[table]) {
-            tables[table] = {
-                tableNo: table,
-                totalAmount: 0,
-                orders: [] // All tickets for this table
-            };
-        }
+        if (!tables[table]) tables[table] = { tableNo: table, totalAmount: 0, orders: [] };
         tables[table].totalAmount += order.totalAmount;
         tables[table].orders.push(order);
     });
 
-    const sortedTables = Object.values(tables).sort((a,b) => a.tableNo.localeCompare(b.tableNo));
+    const sortedTables = Object.values(tables).sort((a,b) => {
+        return String(a.tableNo).localeCompare(String(b.tableNo), undefined, { numeric: true });
+    });
 
     return (
         <div className="max-w-4xl mx-auto p-4 pb-24">
-             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <Receipt className="text-blue-600" /> Active Tables & Bills
-            </h2>
+             <div className="flex items-center gap-2 mb-6">
+                <Receipt className="text-blue-600" size={28} /> 
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Active Bills</h2>
+                    <p className="text-sm text-gray-500">Settle a table to clear it.</p>
+                </div>
+            </div>
 
             {sortedTables.length === 0 ? (
-                <div className="text-center py-20 text-gray-400">No active tables right now.</div>
+                <div className="text-center py-20 text-gray-400 bg-gray-50 rounded-xl">No active bills.</div>
             ) : (
                 <div className="grid gap-6">
                     {sortedTables.map((t) => (
-                        <div key={t.tableNo} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            {/* Table Header */}
+                        <div key={t.tableNo} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col ${t.tableNo.toString().startsWith('PARCEL') ? 'border-yellow-400' : 'border-gray-200'}`}>
                             <div className="bg-gray-50 p-4 flex justify-between items-center border-b">
-                                <h3 className="font-bold text-xl text-gray-800">
-                                    {t.tableNo === 'PARCEL' ? '📦 Parcel / Takeaway' : `Table ${t.tableNo}`}
-                                </h3>
+                                <div>
+                                    <h3 className="font-bold text-xl text-gray-800">
+                                        {t.tableNo.toString().startsWith('PARCEL') ? t.tableNo : `Table ${t.tableNo}`}
+                                    </h3>
+                                    <p className="text-xs text-gray-500">{t.orders.length} Tickets</p>
+                                </div>
                                 <div className="text-right">
-                                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Grand Total</span>
-                                    <div className="text-2xl font-bold text-green-700">₹{t.totalAmount}</div>
+                                    <div className="text-3xl font-bold text-green-700">₹{t.totalAmount}</div>
                                 </div>
                             </div>
                             
-                            {/* Tickets List */}
-                            <div className="p-4 bg-gray-50/50">
-                                <div className="space-y-4">
-                                    {t.orders.map((order, i) => (
-                                        <div key={order.id} className="bg-white border border-gray-100 rounded p-3 text-sm relative">
-                                            <div className="font-bold text-gray-400 text-xs mb-1 flex justify-between">
-                                                <span>TICKET #{i+1} ({new Date(order.createdAt?.seconds * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
-                                                {order.status === 'completed' && <span className="text-green-600">PAID</span>}
-                                            </div>
+                            <div className="p-4 flex-grow space-y-2">
+                                {t.orders.map((order, i) => (
+                                    // RESTORED GREEN GLOW LOGIC HERE
+                                    <div key={order.id} className={`border-b pb-2 last:border-0 p-2 rounded ${order.status === 'served' ? 'bg-green-50 border border-green-200 shadow-sm' : ''}`}>
+                                        <div className="font-bold text-[10px] text-gray-400 flex justify-between items-center">
+                                            <span>TICKET #{order.id.slice(-4)}</span>
+                                            {order.status === 'served' ? (
+                                                <span className="text-green-700 flex items-center gap-1"><CheckCircle size={10}/> SERVED</span>
+                                            ) : (
+                                                <span className="text-orange-500 flex items-center gap-1"><Clock size={10}/> COOKING</span>
+                                            )}
+                                        </div>
+                                        {order.note && <div className="text-red-500 text-xs font-bold mt-1">NOTE: {order.note}</div>}
+                                        
+                                        <div className="mt-1">
                                             {order.items.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between">
-                                                    <span>{item.qty} x {item.name}</span>
+                                                <div key={idx} className="flex justify-between text-sm text-gray-700">
+                                                    <span>{item.qty} x {item.name} {item.variant && `(${item.variant})`}</span>
                                                     <span>₹{item.price * item.qty}</span>
                                                 </div>
                                             ))}
-                                            {/* Action to clear specific ticket */}
-                                            <div className="mt-2 pt-2 border-t border-dashed flex justify-end">
-                                                <button 
-                                                    onClick={() => markOrderPaid(order.id)}
-                                                    className="text-xs text-red-600 font-bold hover:underline"
-                                                >
-                                                    Clear this Ticket
-                                                </button>
-                                            </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-4 bg-gray-50 border-t mt-auto">
+                                <button 
+                                    onClick={() => settleTable(t.orders)}
+                                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-md flex justify-center items-center gap-2"
+                                >
+                                    <IndianRupee size={20} /> Settle Bill
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -288,7 +311,9 @@ const BillView = ({ activeOrders, markOrderPaid }) => {
 };
 
 // --- KITCHEN DISPLAY ---
-const KitchenDisplay = ({ activeOrders, markOrderPaid }) => {
+const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
+  const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
+
   return (
     <div className="max-w-6xl mx-auto p-4 pb-24">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -296,39 +321,41 @@ const KitchenDisplay = ({ activeOrders, markOrderPaid }) => {
           <Store className="text-teal-600" /> Kitchen Display
         </h2>
         <span className="bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-bold shadow-sm">
-          Pending: {activeOrders.length}
+          To Cook: {kitchenOrders.length}
         </span>
       </div>
 
-      {activeOrders.length === 0 ? (
+      {kitchenOrders.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-gray-300 shadow-sm">
           <ChefHat className="mx-auto h-16 w-16 text-gray-300 mb-4" />
           <p className="text-gray-500 text-lg">Kitchen is clear!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeOrders.map((order) => (
-            <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 overflow-hidden relative ${order.tableNo === 'PARCEL' ? 'border-yellow-400' : 'border-teal-500'}`}>
+          {kitchenOrders.map((order) => (
+            <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 overflow-hidden relative ${order.tableNo.toString().startsWith('PARCEL') ? 'border-yellow-400' : 'border-teal-500'}`}>
               
-              {order.tableNo === 'PARCEL' && (
+              {order.tableNo.toString().startsWith('PARCEL') && (
                 <div className="absolute top-0 right-0 bg-yellow-400 text-teal-900 text-xs font-bold px-3 py-1 rounded-bl-lg z-10 flex items-center gap-1">
-                  <Package size={12} /> TAKEAWAY
+                  <Package size={12} /> {order.tableNo}
                 </div>
               )}
 
-              <div className="bg-gray-50 p-4 flex justify-between items-center border-b">
-                <div>
+              <div className="bg-gray-50 p-4 border-b">
+                <div className="flex justify-between items-center mb-2">
                   <h3 className="font-bold text-xl text-gray-800">
-                    {order.tableNo === 'PARCEL' ? '📦 Parcel' : `Table ${order.tableNo}`}
+                    {order.tableNo.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${order.tableNo}`}
                   </h3>
-                  <span className="text-xs text-gray-500 flex items-center gap-1 font-mono mt-1">
-                    <Clock size={12} /> 
+                  <span className="text-xs text-gray-500 font-mono">
+                    <Clock size={12} className="inline mr-1"/> 
                     {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
                   </span>
                 </div>
-                <div className="text-right">
-                    <span className="text-xs font-mono text-gray-400">#{order.id.slice(-4)}</span>
-                </div>
+                {order.note && (
+                    <div className="bg-red-50 text-red-700 p-2 rounded text-sm font-bold border border-red-200">
+                        NOTE: {order.note}
+                    </div>
+                )}
               </div>
               
               <div className="p-4 max-h-64 overflow-y-auto">
@@ -353,10 +380,10 @@ const KitchenDisplay = ({ activeOrders, markOrderPaid }) => {
 
               <div className="p-4 bg-gray-50 border-t">
                 <button 
-                  onClick={() => markOrderPaid(order.id)}
+                  onClick={() => updateOrderStatus(order.id, 'served')}
                   className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-md active:scale-95"
                 >
-                  <CheckCircle size={18} /> Ready / Served
+                  <Utensils size={18} /> Mark Served
                 </button>
               </div>
             </div>
@@ -367,10 +394,11 @@ const KitchenDisplay = ({ activeOrders, markOrderPaid }) => {
   );
 };
 
-const MenuCard = ({ item, addToCart }) => {
+const MenuCard = ({ item, addToCart, unavailable }) => {
   const [selectedVariant, setSelectedVariant] = useState(item.variants ? item.variants[0] : null);
 
   const handleAdd = () => {
+    if(unavailable) return;
     if (selectedVariant) {
         const variantItem = {
             ...item,
@@ -386,7 +414,14 @@ const MenuCard = ({ item, addToCart }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden">
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${unavailable ? 'opacity-60 grayscale' : ''}`}>
+        
+        {unavailable && (
+            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold rounded shadow-lg transform -rotate-12">OUT OF STOCK</span>
+            </div>
+        )}
+
         <div className="w-28 h-auto md:w-32 md:h-auto relative flex-shrink-0 bg-gray-100">
             <img 
                 src={item.image} 
@@ -427,6 +462,7 @@ const MenuCard = ({ item, addToCart }) => {
                 </span>
                 <button 
                     onClick={handleAdd}
+                    disabled={unavailable}
                     className="bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-100 transition active:scale-95 flex items-center gap-1 border border-teal-200"
                 >
                     ADD <Plus size={12} />
@@ -442,22 +478,29 @@ const MenuCard = ({ item, addToCart }) => {
 const App = () => {
   const [view, setView] = useState('loading'); 
   const [cart, setCart] = useState([]);
-  const [activeOrders, setActiveOrders] = useState([]);
+  const [activeOrders, setActiveOrders] = useState([]); 
   const [currentTable, setCurrentTable] = useState(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [kitchenPassword, setKitchenPassword] = useState('');
   const [isStaff, setIsStaff] = useState(false);
+  const [orderNote, setOrderNote] = useState('');
   
-  // AUDIO REF
-  const audioRef = useRef(null);
-  const prevOrdersCount = useRef(0);
+  // STORE SETTINGS STATE
+  const [storeSettings, setStoreSettings] = useState({ rushMode: false, unavailable: [] });
 
-  // 1. INITIALIZE
+  const audioRef = useRef(null);
+  const prevPendingCount = useRef(0);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
     if (tableParam) {
-        setCurrentTable(tableParam);
+        if(tableParam === 'PARCEL') {
+             const uniqueId = `PARCEL-${Math.floor(1000 + Math.random() * 9000)}`;
+             setCurrentTable(uniqueId);
+        } else {
+             setCurrentTable(tableParam);
+        }
         setIsStaff(false);
         setView('menu');
     } else {
@@ -466,7 +509,19 @@ const App = () => {
     }
   }, []);
 
-  // 2. LISTEN TO FIRESTORE & HANDLE AUDIO
+  // LISTEN TO SETTINGS - NOW WITH INSTANT UPDATES
+  useEffect(() => {
+      const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
+          if (doc.exists()) {
+              setStoreSettings(doc.data());
+          } else {
+              setDoc(doc.ref, { rushMode: false, unavailable: [] });
+          }
+      });
+      return () => unsub();
+  }, []);
+
+  // LISTEN TO ORDERS
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -475,17 +530,14 @@ const App = () => {
         ...doc.data()
       }));
       
-      const pendingOrders = orders.filter(o => o.status !== 'completed');
-      setActiveOrders(pendingOrders);
+      const liveOrders = orders.filter(o => o.status !== 'paid');
+      setActiveOrders(liveOrders);
 
-      // Play Sound if new order arrived
-      // We check if current pending count is GREATER than previous
-      if (pendingOrders.length > prevOrdersCount.current) {
-          if(audioRef.current) {
-              audioRef.current.play().catch(e => console.log("Audio play failed (interact first):", e));
-          }
+      const pendingCount = liveOrders.filter(o => o.status === 'pending').length;
+      if (pendingCount > prevPendingCount.current) {
+          if(audioRef.current) audioRef.current.play().catch(e => console.log("Audio play failed:", e));
       }
-      prevOrdersCount.current = pendingOrders.length;
+      prevPendingCount.current = pendingCount;
     });
     return () => unsubscribe();
   }, []);
@@ -516,9 +568,11 @@ const App = () => {
         items: cart,
         totalAmount: totalAmount,
         status: 'pending',
+        note: orderNote, 
         createdAt: serverTimestamp(),
       });
       setCart([]);
+      setOrderNote('');
       setView('success');
       
       if(isStaff) {
@@ -534,14 +588,46 @@ const App = () => {
     setIsOrdering(false);
   };
 
-  const markOrderPaid = async (orderId) => {
-    if(window.confirm("Mark this ticket as Done/Paid?")) {
+  const updateOrderStatus = async (orderId, newStatus) => {
       try {
-        await updateDoc(doc(db, "orders", orderId), { status: 'completed' });
+        await updateDoc(doc(db, "orders", orderId), { status: newStatus });
       } catch (error) {
         console.error("Error:", error);
       }
-    }
+  };
+
+  const settleTable = async (tableOrders) => {
+      const total = tableOrders.reduce((acc, order) => acc + order.totalAmount, 0);
+      if(!window.confirm(`Settle bill? Total: ₹${total}`)) return;
+
+      try {
+          await Promise.all(tableOrders.map(order => 
+              updateDoc(doc(db, "orders", order.id), { status: 'paid' })
+          ));
+      } catch(error) {
+          console.error("Error settling table:", error);
+          alert("Failed to settle table.");
+      }
+  };
+
+  // ADMIN CONTROLS
+  const toggleRushMode = async () => {
+      const newMode = !storeSettings.rushMode;
+      // Optimistic Update
+      setStoreSettings(prev => ({...prev, rushMode: newMode}));
+      await updateDoc(doc(db, "settings", "store"), { rushMode: newMode });
+  };
+
+  const toggleStock = async (itemId) => {
+      let list = storeSettings.unavailable || [];
+      if(list.includes(itemId)) {
+          list = list.filter(id => id !== itemId);
+      } else {
+          list.push(itemId);
+      }
+      // Optimistic Update
+      setStoreSettings(prev => ({...prev, unavailable: list}));
+      await updateDoc(doc(db, "settings", "store"), { unavailable: list });
   };
 
   const handleLogin = () => {
@@ -561,14 +647,11 @@ const App = () => {
   };
 
   // --- VIEWS ---
-
   if (view === 'loading') return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold">Loading PC's Kitchen...</div>;
 
   if (view === 'login') return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-          {/* AUDIO ELEMENT */}
-          <audio ref={audioRef} src="/bell.wav" preload="auto" />
-
+          <audio ref={audioRef} src="/bell.mp3" preload="auto" />
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
               <div className="flex justify-center mb-4">
                   <div className="bg-teal-100 p-3 rounded-full">
@@ -576,8 +659,6 @@ const App = () => {
                   </div>
               </div>
               <h2 className="text-2xl font-bold text-center mb-1 text-gray-800">Staff Login</h2>
-              <p className="text-center text-gray-500 mb-6 text-sm">Enter PIN to access System</p>
-              
               <input 
                 type="password" 
                 placeholder="PIN" 
@@ -588,38 +669,45 @@ const App = () => {
               <button onClick={handleLogin} className="w-full bg-teal-800 text-white py-3 rounded-lg font-bold hover:bg-teal-900 transition shadow-lg">
                   Access Dashboard
               </button>
-              
-              <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-                  <p className="text-xs text-gray-400">Not a staff member?</p>
-                  <p className="text-xs text-gray-500">Scan the QR code on your table to order.</p>
-              </div>
           </div>
       </div>
   );
 
-  // Staff Dashboard View
   if (view === 'staff-dashboard') return (
       <>
-        {/* AUDIO ELEMENT */}
-        <audio ref={audioRef} src="/bell.wav" preload="auto" />
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} />
-        <StaffDashboard setView={setView} setCurrentTable={setCurrentTable} />
+        <audio ref={audioRef} src="/bell.mp3" preload="auto" />
+        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <StaffDashboard setView={setView} setCurrentTable={setCurrentTable} storeSettings={storeSettings} toggleRushMode={toggleRushMode} />
+      </>
+  );
+
+  if (view === 'manage-menu') return (
+      <>
+        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <ManageMenuView setView={setView} storeSettings={storeSettings} toggleStock={toggleStock} />
       </>
   );
 
   if (view === 'bills') return (
       <>
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} />
-        <BillView activeOrders={activeOrders} markOrderPaid={markOrderPaid} />
+        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <BillView activeOrders={activeOrders} settleTable={settleTable} />
       </>
   );
 
-  // Normal Menu View
+  if (view === 'kitchen') return (
+     <>
+        <audio ref={audioRef} src="/bell.mp3" preload="auto" />
+        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} />
+     </>
+  );
+
+  // MENU
   if (view === 'menu') return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
-      <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} />
+      <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
       <main className="pt-4 max-w-4xl mx-auto px-4 pb-20">
-        
         {isStaff && (
             <div className="bg-orange-100 border-l-4 border-orange-500 p-3 mb-4 rounded shadow-sm flex justify-between items-center">
                 <div>
@@ -629,7 +717,6 @@ const App = () => {
                 <button onClick={() => setView('staff-dashboard')} className="text-xs bg-white px-3 py-1 rounded border border-orange-200">Cancel</button>
             </div>
         )}
-
         {["Starters", "Egg Specials", "Main Course", "Breads & Rice"].map(cat => (
             <div key={cat} className="mb-8">
             <h2 className="text-xl font-extrabold mb-4 text-gray-800 flex items-center">
@@ -638,7 +725,12 @@ const App = () => {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {MENU_ITEMS.filter(item => item.category === cat).map(item => (
-                <MenuCard key={item.id} item={item} addToCart={addToCart} />
+                <MenuCard 
+                    key={item.id} 
+                    item={item} 
+                    addToCart={addToCart} 
+                    unavailable={storeSettings.unavailable?.includes(item.id)} 
+                />
                 ))}
             </div>
             </div>
@@ -663,15 +755,14 @@ const App = () => {
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
       return (
         <div className="min-h-screen bg-gray-50">
-           <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} />
+           <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
            <div className="max-w-xl mx-auto p-4">
                 <button onClick={() => setView('menu')} className="flex items-center text-gray-500 mb-6 hover:text-teal-600 font-medium">
                 <ArrowLeft size={18} className="mr-1" /> Back to Menu
                 </button>
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-gray-800">
-                    {currentTable === 'PARCEL' ? '📦 Parcel Order' : `Table ${currentTable} Order`}
+                    {currentTable.toString().startsWith('PARCEL') ? '📦 Parcel Order' : `Table ${currentTable} Order`}
                 </h2>
-
                 {cart.length === 0 ? (
                     <p>Cart is empty</p>
                 ) : (
@@ -691,6 +782,21 @@ const App = () => {
                                 </div>
                             ))}
                         </div>
+                        
+                        {/* COOKING INSTRUCTIONS */}
+                        <div className="p-4 bg-yellow-50 border-t border-yellow-100">
+                            <label className="text-xs font-bold text-yellow-800 uppercase mb-2 block flex items-center gap-1">
+                                <Info size={12}/> Cooking Instructions
+                            </label>
+                            <textarea 
+                                placeholder="E.g. Less spicy, No onion, Extra lemon..." 
+                                className="w-full p-2 border border-yellow-300 rounded text-sm focus:outline-none focus:border-yellow-500 bg-white"
+                                rows="2"
+                                value={orderNote}
+                                onChange={(e) => setOrderNote(e.target.value)}
+                            ></textarea>
+                        </div>
+
                         <div className="bg-gray-50 p-6 border-t border-gray-100">
                             <div className="flex justify-between text-xl font-bold text-gray-800 mb-6">
                                 <span>Total Pay</span>
@@ -712,16 +818,6 @@ const App = () => {
       );
   }
 
-  // Kitchen View
-  if (view === 'kitchen') return (
-     <>
-        <audio ref={audioRef} src="/bell.wav" preload="auto" />
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} />
-        <KitchenDisplay activeOrders={activeOrders} markOrderPaid={markOrderPaid} />
-     </>
-  );
-
-  // Success View
   if (view === 'success') return (
       <div className="flex flex-col items-center justify-center pt-24 px-4 text-center min-h-screen bg-gray-50">
         <div className="bg-green-100 p-6 rounded-full mb-6 animate-pulse">
