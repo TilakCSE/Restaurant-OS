@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, query, orderBy, serverTimestamp, getDoc } from 'firebase/firestore';
-import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, XCircle } from 'lucide-react';
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
 
@@ -35,6 +35,10 @@ const MENU_ITEMS = [
   { id: 204, category: "Egg Specials", name: "Boil Tikka Masala", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
   { id: 206, category: "Egg Specials", name: "Egg Curry", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
 
+  // --- THALI (Lunch Only: 12:30 - 3:00 PM) ---
+  { id: 501, category: "Lunch Specials (Thali)", name: "Chicken Thali", price: 170, isVeg: false, image: "/dishes/chicken-thali.avif", isLunchOnly: true },
+  { id: 502, category: "Lunch Specials (Thali)", name: "Egg Thali", price: 170, isVeg: false, image: "/dishes/egg-thali.avif", isLunchOnly: true },
+
   // --- MAIN COURSE ---
   { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120 }, { name: "Full", price: 220 }] },
   { id: 303, category: "Main Course", name: "Sp. Chicken Masala", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, variants: [{ name: "Half", price: 160 }, { name: "Full", price: 250 }] },
@@ -51,17 +55,24 @@ const MENU_ITEMS = [
   { id: 404, category: "Breads & Rice", name: "Plain Rice", isVeg: true, image: "/dishes/rice.avif", price: 40, variants: [{ name: "Half", price: 40 }, { name: "Full", price: 60 }] },
   { id: 406, category: "Breads & Rice", name: "Jeera Rice", isVeg: true, image: "/dishes/jeera-rice.avif", price: 60, variants: [{ name: "Half", price: 60 }, { name: "Full", price: 90 }] },
   { id: 408, category: "Breads & Rice", name: "Roasted Papad", price: 10, isVeg: true, image: "/dishes/papad.avif" },
+  
+  // --- BEVERAGES ---
+  { id: 601, category: "Beverages", name: "Mineral Water", price: 10, isVeg: true, image: "/dishes/water.avif" },
 ];
 
 // --- COMPONENTS ---
 
 const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, storeSettings }) => (
   <header className="bg-teal-800 text-white shadow-lg sticky top-0 z-50">
-    {/* RUSH MODE BANNER */}
-    {storeSettings?.rushMode && (
+    {/* ALERTS: CLOSED or RUSH */}
+    {!storeSettings?.isOpen ? (
+        <div className="bg-gray-800 text-white text-xs md:text-sm font-bold p-3 text-center flex items-center justify-center gap-2">
+            <Ban size={16} /> RESTAURANT IS CLOSED
+        </div>
+    ) : storeSettings?.rushMode && (
         <div className="bg-red-600 text-white text-xs md:text-sm font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse">
             <AlertTriangle size={16} /> 
-            Restaurant is in RUSH MODE. Orders may take longer than usual.
+            RUSH MODE: Orders may take longer than usual.
         </div>
     )}
     
@@ -108,7 +119,7 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, store
   </header>
 );
 
-const StaffDashboard = ({ setView, setCurrentTable, storeSettings, toggleRushMode }) => {
+const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSettings }) => {
     const [manualTable, setManualTable] = useState('');
 
     const startManualOrder = () => {
@@ -129,67 +140,53 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, toggleRushMod
                 <ChefHat className="text-teal-600" /> Staff Dashboard
             </h2>
 
+            {/* LIVE CONTROLS */}
             <div className="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200">
-                <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-3">Live Controls</h3>
-                <div className="flex gap-4">
+                <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-3">Restaurant Controls</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <button 
-                        onClick={toggleRushMode}
-                        className={`flex-1 py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition shadow-sm ${storeSettings.rushMode ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-600'}`}
+                        onClick={() => updateSettings('isOpen', !storeSettings.isOpen)}
+                        className={`py-3 px-2 rounded-lg font-bold flex flex-col items-center justify-center gap-1 transition shadow-sm ${storeSettings.isOpen ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-800 text-white'}`}
                     >
-                        <AlertTriangle size={18} /> {storeSettings.rushMode ? 'Rush Mode ON' : 'Rush Mode OFF'}
+                        <Power size={20} /> {storeSettings.isOpen ? 'Restaurant ONLINE' : 'Restaurant OFFLINE'}
                     </button>
+                    
+                    <button 
+                        onClick={() => updateSettings('rushMode', !storeSettings.rushMode)}
+                        className={`py-3 px-2 rounded-lg font-bold flex flex-col items-center justify-center gap-1 transition shadow-sm ${storeSettings.rushMode ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                        <AlertTriangle size={20} /> {storeSettings.rushMode ? 'Rush Mode ON' : 'Rush Mode OFF'}
+                    </button>
+                    
                     <button 
                         onClick={() => setView('manage-menu')}
-                        className="flex-1 py-3 px-4 rounded-lg font-bold bg-teal-100 text-teal-800 flex items-center justify-center gap-2 hover:bg-teal-200 shadow-sm"
+                        className="py-3 px-2 rounded-lg font-bold bg-teal-100 text-teal-800 flex flex-col items-center justify-center gap-1 hover:bg-teal-200 shadow-sm col-span-2 md:col-span-1"
                     >
-                        <Ban size={18} /> Out of Stock
+                        <Ban size={20} /> Manage Stock (86)
                     </button>
                 </div>
             </div>
 
             <div className="grid gap-4 max-w-md mx-auto">
-                <button 
-                    onClick={() => setView('kitchen')}
-                    className="bg-white p-6 rounded-xl shadow-md border-l-4 border-teal-600 flex items-center justify-between group hover:bg-teal-50 transition"
-                >
-                    <div className="text-left">
-                        <h3 className="font-bold text-xl text-gray-800">Kitchen Display</h3>
-                        <p className="text-sm text-gray-500">Live KDS System</p>
-                    </div>
+                <button onClick={() => setView('kitchen')} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-teal-600 flex items-center justify-between hover:bg-teal-50">
+                    <div className="text-left"><h3 className="font-bold text-xl text-gray-800">Kitchen Display</h3><p className="text-sm text-gray-500">Live KDS & Edits</p></div>
                     <Store className="text-teal-600" size={32} />
                 </button>
 
-                <button 
-                    onClick={() => setView('bills')}
-                    className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-600 flex items-center justify-between group hover:bg-blue-50 transition"
-                >
-                    <div className="text-left">
-                        <h3 className="font-bold text-xl text-gray-800">Active Bills</h3>
-                        <p className="text-sm text-gray-500">Settle & Clear Tables</p>
-                    </div>
+                <button onClick={() => setView('bills')} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-600 flex items-center justify-between hover:bg-blue-50">
+                    <div className="text-left"><h3 className="font-bold text-xl text-gray-800">Active Bills</h3><p className="text-sm text-gray-500">Settle Bills</p></div>
                     <Receipt className="text-blue-600" size={32} />
                 </button>
 
                 <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-orange-500">
-                    <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
-                        <ClipboardList className="text-orange-500" /> Manual Order
-                    </h3>
+                    <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2"><ClipboardList className="text-orange-500" /> Manual Order</h3>
                     <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="Table No" 
-                            className="flex-1 border p-3 rounded-lg text-lg outline-none focus:border-orange-500"
-                            value={manualTable}
-                            onChange={(e) => setManualTable(e.target.value)}
-                        />
+                        <input type="text" placeholder="Table No" className="flex-1 border p-3 rounded-lg text-lg outline-none focus:border-orange-500" value={manualTable} onChange={(e) => setManualTable(e.target.value)} />
                         <button onClick={startManualOrder} className="bg-orange-600 text-white px-6 rounded-lg font-bold hover:bg-orange-700">GO</button>
                     </div>
                 </div>
                 
-                 <button 
-                    onClick={startParcelOrder}
-                    className="bg-yellow-400 p-4 rounded-xl shadow-md flex items-center justify-center gap-2 font-bold text-teal-900 hover:bg-yellow-500"
-                >
+                 <button onClick={startParcelOrder} className="bg-yellow-400 p-4 rounded-xl shadow-md flex items-center justify-center gap-2 font-bold text-teal-900 hover:bg-yellow-500">
                     <Package /> New Parcel / Takeaway
                 </button>
             </div>
@@ -197,30 +194,59 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, toggleRushMod
     );
 };
 
-// --- STOCK MANAGEMENT VIEW ---
+// --- GRANULAR STOCK MANAGEMENT (Half/Full) ---
 const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
     return (
         <div className="max-w-2xl mx-auto p-4 pb-24">
             <div className="flex items-center gap-4 mb-6">
                 <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full"><ArrowLeft size={20}/></button>
-                <h2 className="text-2xl font-bold text-gray-800">Manage Stock (86 List)</h2>
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Manage Stock (86 List)</h2>
+                    <p className="text-xs text-gray-500">Tap to toggle availability. Red = Out of Stock.</p>
+                </div>
             </div>
-            <p className="mb-4 text-sm text-gray-500">Tap items to mark them as Out of Stock.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {MENU_ITEMS.map(item => {
-                    const isUnavailable = storeSettings.unavailable?.includes(item.id);
-                    return (
-                        <div 
-                            key={item.id} 
-                            onClick={() => toggleStock(item.id)}
-                            className={`p-4 rounded-lg border flex justify-between items-center cursor-pointer transition ${isUnavailable ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200'}`}
-                        >
-                            <span className={`font-bold ${isUnavailable ? 'text-red-700 line-through' : 'text-gray-800'}`}>{item.name}</span>
-                            {isUnavailable ? <Ban className="text-red-600" size={20} /> : <CheckCircle className="text-green-400" size={20} />}
+            <div className="grid grid-cols-1 gap-3">
+                {MENU_ITEMS.map(item => (
+                    <div key={item.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-bold text-gray-800">{item.name}</h3>
                         </div>
-                    )
-                })}
+                        
+                        <div className="flex flex-wrap gap-2">
+                            {/* If item has variants, show buttons for each variant */}
+                            {item.variants ? (
+                                item.variants.map(v => {
+                                    const variantId = `${item.id}-${v.name}`; // 103-Half
+                                    const isUnavailable = storeSettings.unavailable?.includes(variantId);
+                                    return (
+                                        <button 
+                                            key={variantId}
+                                            onClick={() => toggleStock(variantId)}
+                                            className={`px-4 py-2 rounded text-sm font-bold border transition flex items-center gap-2 ${isUnavailable ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700'}`}
+                                        >
+                                            {isUnavailable ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                                            {v.name}
+                                        </button>
+                                    )
+                                })
+                            ) : (
+                                // No variants, just main item ID
+                                (() => {
+                                    const isUnavailable = storeSettings.unavailable?.includes(item.id.toString());
+                                    return (
+                                        <button 
+                                            onClick={() => toggleStock(item.id.toString())}
+                                            className={`w-full px-4 py-2 rounded text-sm font-bold border transition flex items-center justify-center gap-2 ${isUnavailable ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700'}`}
+                                        >
+                                            {isUnavailable ? <><XCircle size={16} /> Out of Stock</> : <><CheckCircle size={16} /> Available</>}
+                                        </button>
+                                    )
+                                })()
+                            )}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -229,6 +255,7 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
 // --- BILL VIEW ---
 const BillView = ({ activeOrders, settleTable }) => {
     const tables = {};
+    
     activeOrders.forEach(order => {
         const table = order.tableNo;
         if (!tables[table]) tables[table] = { tableNo: table, totalAmount: 0, orders: [] };
@@ -242,11 +269,13 @@ const BillView = ({ activeOrders, settleTable }) => {
 
     return (
         <div className="max-w-4xl mx-auto p-4 pb-24">
-             <div className="flex items-center gap-2 mb-6">
-                <Receipt className="text-blue-600" size={28} /> 
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Active Bills</h2>
-                    <p className="text-sm text-gray-500">Settle a table to clear it.</p>
+             <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                    <Receipt className="text-blue-600" size={28} /> 
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Active Bills</h2>
+                        <p className="text-sm text-gray-500">Manage ongoing tables.</p>
+                    </div>
                 </div>
             </div>
 
@@ -268,28 +297,29 @@ const BillView = ({ activeOrders, settleTable }) => {
                                 </div>
                             </div>
                             
-                            <div className="p-4 flex-grow space-y-2">
+                            <div className="p-4 flex-grow space-y-3">
                                 {t.orders.map((order, i) => (
-                                    // RESTORED GREEN GLOW LOGIC HERE
-                                    <div key={order.id} className={`border-b pb-2 last:border-0 p-2 rounded ${order.status === 'served' ? 'bg-green-50 border border-green-200 shadow-sm' : ''}`}>
-                                        <div className="font-bold text-[10px] text-gray-400 flex justify-between items-center">
-                                            <span>TICKET #{order.id.slice(-4)}</span>
+                                    <div key={order.id} className={`border rounded p-3 text-sm relative ${order.status === 'served' ? 'bg-green-50 border-green-200 shadow-sm' : ''}`}>
+                                        <div className="font-bold text-[10px] text-gray-400 flex justify-between items-center mb-2">
+                                            <span className="flex items-center gap-2">
+                                                TICKET #{order.id.slice(-4)}
+                                            </span>
                                             {order.status === 'served' ? (
-                                                <span className="text-green-700 flex items-center gap-1"><CheckCircle size={10}/> SERVED</span>
+                                                <span className="text-green-800 bg-green-200 px-2 py-0.5 rounded flex items-center gap-1"><CheckCircle size={10}/> SERVED</span>
                                             ) : (
-                                                <span className="text-orange-500 flex items-center gap-1"><Clock size={10}/> COOKING</span>
+                                                <span className="text-orange-600 bg-orange-100 px-2 py-0.5 rounded flex items-center gap-1"><Clock size={10}/> COOKING</span>
                                             )}
                                         </div>
-                                        {order.note && <div className="text-red-500 text-xs font-bold mt-1">NOTE: {order.note}</div>}
                                         
-                                        <div className="mt-1">
-                                            {order.items.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between text-sm text-gray-700">
-                                                    <span>{item.qty} x {item.name} {item.variant && `(${item.variant})`}</span>
-                                                    <span>₹{item.price * item.qty}</span>
+                                        {order.items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm text-gray-700 mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    {/* FIX: Double Naming Removed Here */}
+                                                    <span>{item.qty} x {item.name}</span>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <span>₹{item.price * item.qty}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 ))}
                             </div>
@@ -297,7 +327,7 @@ const BillView = ({ activeOrders, settleTable }) => {
                             <div className="p-4 bg-gray-50 border-t mt-auto">
                                 <button 
                                     onClick={() => settleTable(t.orders)}
-                                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-md flex justify-center items-center gap-2"
+                                    className={`w-full py-4 rounded-xl font-bold text-lg transition shadow-md flex justify-center items-center gap-2 bg-blue-600 text-white hover:bg-blue-700`}
                                 >
                                     <IndianRupee size={20} /> Settle Bill
                                 </button>
@@ -310,19 +340,30 @@ const BillView = ({ activeOrders, settleTable }) => {
     );
 };
 
-// --- KITCHEN DISPLAY ---
-const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
+// --- KITCHEN DISPLAY (NOW WITH EDIT CONTROLS) ---
+const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder }) => {
+  const [editMode, setEditMode] = useState(false);
   const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
 
   return (
     <div className="max-w-6xl mx-auto p-4 pb-24">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <Store className="text-teal-600" /> Kitchen Display
-        </h2>
-        <span className="bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-bold shadow-sm">
-          To Cook: {kitchenOrders.length}
-        </span>
+        <div className="flex items-center gap-2">
+            <Store className="text-teal-600" size={28} /> 
+            <h2 className="text-2xl font-bold text-gray-800">Kitchen Display</h2>
+        </div>
+        
+        <div className="flex gap-2 w-full md:w-auto">
+            <button 
+                onClick={() => setEditMode(!editMode)}
+                className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 ${editMode ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+                {editMode ? <><X size={16}/> DONE EDITING</> : <><Edit size={16}/> EDIT / CANCEL</>}
+            </button>
+            <span className="bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-bold shadow-sm flex items-center">
+                Count: {kitchenOrders.length}
+            </span>
+        </div>
       </div>
 
       {kitchenOrders.length === 0 ? (
@@ -335,20 +376,13 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
           {kitchenOrders.map((order) => (
             <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 overflow-hidden relative ${order.tableNo.toString().startsWith('PARCEL') ? 'border-yellow-400' : 'border-teal-500'}`}>
               
-              {order.tableNo.toString().startsWith('PARCEL') && (
-                <div className="absolute top-0 right-0 bg-yellow-400 text-teal-900 text-xs font-bold px-3 py-1 rounded-bl-lg z-10 flex items-center gap-1">
-                  <Package size={12} /> {order.tableNo}
-                </div>
-              )}
-
               <div className="bg-gray-50 p-4 border-b">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="font-bold text-xl text-gray-800">
                     {order.tableNo.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${order.tableNo}`}
                   </h3>
                   <span className="text-xs text-gray-500 font-mono">
-                    <Clock size={12} className="inline mr-1"/> 
-                    {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+                    #{order.id.slice(-4)}
                   </span>
                 </div>
                 {order.note && (
@@ -363,13 +397,21 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
                   {order.items.map((item, idx) => (
                     <li key={idx} className="flex justify-between items-center border-b border-dashed border-gray-100 pb-2 last:border-0 last:pb-0">
                       <div className="flex gap-3 items-center">
+                        {editMode && (
+                            <button 
+                                onClick={() => deleteItemFromOrder(order, idx)} 
+                                className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition"
+                            >
+                                <Trash2 size={20} />
+                            </button>
+                        )}
                         <span className="font-bold text-gray-800 bg-gray-100 h-8 w-8 flex items-center justify-center rounded-lg text-sm border border-gray-200 shadow-sm">
                           {item.qty}
                         </span>
                         <div>
+                          {/* FIX: Double Naming Removed Here */}
                           <p className={`font-medium ${item.isVeg !== false ? 'text-green-700' : 'text-red-700'}`}>
                             {item.name}
-                            {item.variant && <span className="ml-1 text-xs text-gray-500 font-normal">({item.variant})</span>}
                           </p>
                         </div>
                       </div>
@@ -379,12 +421,21 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
               </div>
 
               <div className="p-4 bg-gray-50 border-t">
-                <button 
-                  onClick={() => updateOrderStatus(order.id, 'served')}
-                  className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-md active:scale-95"
-                >
-                  <Utensils size={18} /> Mark Served
-                </button>
+                {editMode ? (
+                    <button 
+                        onClick={() => deleteOrder(order.id)}
+                        className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition flex justify-center items-center gap-2 shadow-md"
+                    >
+                        <Trash2 size={20} /> CANCEL ENTIRE TICKET
+                    </button>
+                ) : (
+                    <button 
+                        onClick={() => updateOrderStatus(order.id, 'served')}
+                        className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-md active:scale-95"
+                    >
+                        <Utensils size={18} /> Mark Served
+                    </button>
+                )}
               </div>
             </div>
           ))}
@@ -394,7 +445,7 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus }) => {
   );
 };
 
-const MenuCard = ({ item, addToCart, unavailable }) => {
+const MenuCard = ({ item, addToCart, unavailable, unavailableVariants }) => {
   const [selectedVariant, setSelectedVariant] = useState(item.variants ? item.variants[0] : null);
 
   const handleAdd = () => {
@@ -403,6 +454,7 @@ const MenuCard = ({ item, addToCart, unavailable }) => {
         const variantItem = {
             ...item,
             id: `${item.id}-${selectedVariant.name}`,
+            // FIX: Ensure name is constructed cleanly once
             name: `${item.name} (${selectedVariant.name})`,
             price: selectedVariant.price,
             variant: selectedVariant.name
@@ -414,7 +466,7 @@ const MenuCard = ({ item, addToCart, unavailable }) => {
   };
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${unavailable ? 'opacity-60 grayscale' : ''}`}>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${unavailable ? 'opacity-60 grayscale pointer-events-none' : ''}`}>
         
         {unavailable && (
             <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
@@ -441,15 +493,18 @@ const MenuCard = ({ item, addToCart, unavailable }) => {
                 
                 {item.variants ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                        {item.variants.map((v) => (
-                            <button 
-                                key={v.name}
-                                onClick={() => setSelectedVariant(v)}
-                                className={`text-[10px] px-2 py-1 rounded border ${selectedVariant.name === v.name ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300'}`}
-                            >
-                                {v.name}
-                            </button>
-                        ))}
+                        {item.variants.map((v) => {
+                            const vUnavailable = unavailableVariants?.includes(`${item.id}-${v.name}`);
+                            return (
+                                <button 
+                                    key={v.name}
+                                    onClick={() => setSelectedVariant(v)}
+                                    className={`text-[10px] px-2 py-1 rounded border transition ${selectedVariant.name === v.name ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300'} ${vUnavailable ? 'opacity-50 decoration-slate-500 line-through' : ''}`}
+                                >
+                                    {v.name}
+                                </button>
+                            )
+                        })}
                     </div>
                 ) : (
                     <p className="text-gray-500 text-xs mt-1 font-bold">₹{item.price}</p>
@@ -486,7 +541,7 @@ const App = () => {
   const [orderNote, setOrderNote] = useState('');
   
   // STORE SETTINGS STATE
-  const [storeSettings, setStoreSettings] = useState({ rushMode: false, unavailable: [] });
+  const [storeSettings, setStoreSettings] = useState({ rushMode: false, isOpen: true, unavailable: [] });
 
   const audioRef = useRef(null);
   const prevPendingCount = useRef(0);
@@ -509,13 +564,13 @@ const App = () => {
     }
   }, []);
 
-  // LISTEN TO SETTINGS - NOW WITH INSTANT UPDATES
+  // LISTEN TO SETTINGS
   useEffect(() => {
       const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
           if (doc.exists()) {
               setStoreSettings(doc.data());
           } else {
-              setDoc(doc.ref, { rushMode: false, unavailable: [] });
+              setDoc(doc.ref, { rushMode: false, isOpen: true, unavailable: [] });
           }
       });
       return () => unsub();
@@ -610,22 +665,47 @@ const App = () => {
       }
   };
 
-  // ADMIN CONTROLS
-  const toggleRushMode = async () => {
-      const newMode = !storeSettings.rushMode;
-      // Optimistic Update
-      setStoreSettings(prev => ({...prev, rushMode: newMode}));
-      await updateDoc(doc(db, "settings", "store"), { rushMode: newMode });
+  const deleteOrder = async (orderId) => {
+      if(!window.confirm("CANCEL THIS ENTIRE TICKET?")) return;
+      try {
+          await deleteDoc(doc(db, "orders", orderId));
+      } catch (error) {
+          console.error("Error deleting order:", error);
+          alert("Could not delete. Check database permissions.");
+      }
   };
 
-  const toggleStock = async (itemId) => {
-      let list = storeSettings.unavailable || [];
-      if(list.includes(itemId)) {
-          list = list.filter(id => id !== itemId);
-      } else {
-          list.push(itemId);
+  const deleteItemFromOrder = async (order, itemIndex) => {
+      if(!window.confirm(`Remove ${order.items[itemIndex].name}?`)) return;
+      
+      const newItems = [...order.items];
+      newItems.splice(itemIndex, 1);
+      const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+      try {
+          if(newItems.length === 0) {
+              await deleteDoc(doc(db, "orders", order.id));
+          } else {
+              await updateDoc(doc(db, "orders", order.id), { items: newItems, totalAmount: newTotal });
+          }
+      } catch (error) {
+          console.error("Error updating order:", error);
       }
-      // Optimistic Update
+  };
+
+  // ADMIN CONTROLS
+  const updateSettings = async (key, value) => {
+      setStoreSettings(prev => ({...prev, [key]: value})); 
+      await updateDoc(doc(db, "settings", "store"), { [key]: value });
+  };
+
+  const toggleStock = async (id) => {
+      let list = storeSettings.unavailable || [];
+      if(list.includes(id)) {
+          list = list.filter(itemId => itemId !== id);
+      } else {
+          list.push(id);
+      }
       setStoreSettings(prev => ({...prev, unavailable: list}));
       await updateDoc(doc(db, "settings", "store"), { unavailable: list });
   };
@@ -651,7 +731,7 @@ const App = () => {
 
   if (view === 'login') return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-          <audio ref={audioRef} src="/bell.mp3" preload="auto" />
+          <audio ref={audioRef} src="/bell.wav" preload="auto" />
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
               <div className="flex justify-center mb-4">
                   <div className="bg-teal-100 p-3 rounded-full">
@@ -675,9 +755,9 @@ const App = () => {
 
   if (view === 'staff-dashboard') return (
       <>
-        <audio ref={audioRef} src="/bell.mp3" preload="auto" />
+        <audio ref={audioRef} src="/bell.wav" preload="auto" />
         <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <StaffDashboard setView={setView} setCurrentTable={setCurrentTable} storeSettings={storeSettings} toggleRushMode={toggleRushMode} />
+        <StaffDashboard setView={setView} setCurrentTable={setCurrentTable} storeSettings={storeSettings} updateSettings={updateSettings} />
       </>
   );
 
@@ -691,16 +771,29 @@ const App = () => {
   if (view === 'bills') return (
       <>
         <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <BillView activeOrders={activeOrders} settleTable={settleTable} />
+        <BillView activeOrders={activeOrders} settleTable={settleTable} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} />
       </>
   );
 
   if (view === 'kitchen') return (
      <>
-        <audio ref={audioRef} src="/bell.mp3" preload="auto" />
+        <audio ref={audioRef} src="/bell.wav" preload="auto" />
         <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} />
+        <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} />
      </>
+  );
+
+  // CHECK IF RESTAURANT IS CLOSED
+  if (!isStaff && storeSettings?.isOpen === false) return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-8 text-center text-white">
+          <Ban size={64} className="text-red-500 mb-6" />
+          <h1 className="text-3xl font-bold mb-2">Restaurant Offline</h1>
+          <p className="text-gray-400">PC's Kitchen is currently closed. <br/>Please check back during operating hours.</p>
+          <div className="mt-8 p-4 bg-gray-800 rounded-lg text-sm text-gray-300">
+              <p>Lunch: 12:30 PM - 2:30 PM</p>
+              <p>Dinner: 7:30 PM - 11:00 PM</p>
+          </div>
+      </div>
   );
 
   // MENU
@@ -717,24 +810,43 @@ const App = () => {
                 <button onClick={() => setView('staff-dashboard')} className="text-xs bg-white px-3 py-1 rounded border border-orange-200">Cancel</button>
             </div>
         )}
-        {["Starters", "Egg Specials", "Main Course", "Breads & Rice"].map(cat => (
-            <div key={cat} className="mb-8">
-            <h2 className="text-xl font-extrabold mb-4 text-gray-800 flex items-center">
-                <span className="w-2 h-8 bg-teal-600 rounded-r-lg mr-3"></span>
-                {cat}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {MENU_ITEMS.filter(item => item.category === cat).map(item => (
-                <MenuCard 
-                    key={item.id} 
-                    item={item} 
-                    addToCart={addToCart} 
-                    unavailable={storeSettings.unavailable?.includes(item.id)} 
-                />
-                ))}
-            </div>
-            </div>
-        ))}
+        
+        {["Lunch Specials (Thali)", "Starters", "Egg Specials", "Main Course", "Breads & Rice", "Beverages"].map(cat => {
+            // TIME FILTER FOR THALI
+            if (cat === "Lunch Specials (Thali)") {
+                const now = new Date();
+                const minutes = now.getHours() * 60 + now.getMinutes();
+                const isLunchTime = minutes >= 750 && minutes <= 900;
+                if (!isLunchTime && !isStaff) return null;
+            }
+
+            const items = MENU_ITEMS.filter(item => item.category === cat);
+            if (items.length === 0) return null;
+
+            return (
+                <div key={cat} className="mb-8">
+                <h2 className="text-xl font-extrabold mb-4 text-gray-800 flex items-center">
+                    <span className="w-2 h-8 bg-teal-600 rounded-r-lg mr-3"></span>
+                    {cat}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {items.map(item => {
+                        const isMainUnavailable = storeSettings.unavailable?.includes(item.id.toString());
+                        return (
+                            <MenuCard 
+                                key={item.id} 
+                                item={item} 
+                                addToCart={addToCart} 
+                                unavailable={isMainUnavailable}
+                                unavailableVariants={storeSettings.unavailable || []}
+                            />
+                        );
+                    })}
+                </div>
+                </div>
+            );
+        })}
+        
         {cart.length > 0 && (
             <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
                 <button 
@@ -783,7 +895,6 @@ const App = () => {
                             ))}
                         </div>
                         
-                        {/* COOKING INSTRUCTIONS */}
                         <div className="p-4 bg-yellow-50 border-t border-yellow-100">
                             <label className="text-xs font-bold text-yellow-800 uppercase mb-2 block flex items-center gap-1">
                                 <Info size={12}/> Cooking Instructions
