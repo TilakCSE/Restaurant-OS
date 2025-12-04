@@ -5,6 +5,8 @@ import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, Uten
 
 // --- FIREBASE CONFIGURATION ---
 
+
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.VITE_AUTH_DOMAIN,
@@ -15,38 +17,81 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_MEASUREMENT_ID
 };
 
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // --- MENU DATA ---
+// Added 'desc' for variants and 'description' for main items
 const MENU_ITEMS = [
   // --- STARTERS ---
   { id: 101, category: "Starters", name: "Fish Fry (01 pc)", price: 90, isVeg: false, image: "/dishes/fish-fry.avif" },
   { id: 102, category: "Starters", name: "Egg Boil Fry (2 eggs)", price: 60, isVeg: false, image: "/dishes/egg-fry.avif" },
-  { id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
-  { id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, variants: [{ name: "Half", price: 130 }, { name: "Full", price: 220 }] },
-  { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" },
-  { id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, variants: [{ name: "Half", price: 150 }, { name: "Full", price: 240 }] },
+  { 
+    id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, 
+    variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] 
+  },
+  { 
+    id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, 
+    variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] 
+  },
+  { 
+    id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" 
+  },
+  { 
+    id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, 
+    variants: [{ name: "Half (4pcs)", price: 150 }, { name: "Full (8pcs)", price: 240 }] 
+  },
 
   // --- EGG SPECIALS ---
   { id: 201, category: "Egg Specials", name: "Omelette (2 Eggs)", price: 70, isVeg: false, image: "/dishes/omelette.avif" },
   { id: 202, category: "Egg Specials", name: "Egg Bhurji (2 Eggs)", price: 100, isVeg: false, image: "/dishes/egg-bhurji.avif" },
   { id: 203, category: "Egg Specials", name: "Egg Pulao", price: 120, isVeg: false, image: "/dishes/egg-pulao.avif" },
-  { id: 204, category: "Egg Specials", name: "Boil Tikka Masala", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
-  { id: 206, category: "Egg Specials", name: "Egg Curry", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
+  { id: 204, category: "Egg Specials", name: "Boil Tikka Masala (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
+  { id: 206, category: "Egg Specials", name: "Egg Curry (2 Eggs)", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
 
   // --- THALI (Lunch Only: 12:30 - 3:00 PM) ---
   { id: 501, category: "Lunch Specials (Thali)", name: "Chicken Thali", price: 170, isVeg: false, image: "/dishes/chicken-thali.avif", isLunchOnly: true },
   { id: 502, category: "Lunch Specials (Thali)", name: "Egg Thali", price: 170, isVeg: false, image: "/dishes/egg-thali.avif", isLunchOnly: true },
 
   // --- MAIN COURSE ---
-  { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120 }, { name: "Full", price: 220 }] },
-  { id: 303, category: "Main Course", name: "Sp. Chicken Masala", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, variants: [{ name: "Half", price: 160 }, { name: "Full", price: 250 }] },
-  { id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif" },
-  { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif" },
-  { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif" },
-  { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] },
-  { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, variants: [{ name: "Half", price: 260 }, { name: "Full", price: 410 }] },
+  { 
+    id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, 
+    variants: [
+      { name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, 
+      { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }
+    ] 
+  },
+  { 
+    id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, 
+    variants: [
+      { name: "Half", price: 160, desc: "2 thigh, thick gravy" }, 
+      { name: "Full", price: 250, desc: "1 leg, 2 thigh, thick gravy" }
+    ] 
+  },
+  { 
+    id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif", 
+    description: "6 pc boneless, gravy" 
+  },
+  { 
+    id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", 
+    description: "2 pc, gravy" 
+  },
+  { 
+    id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", 
+    description: "12 pc, gravy" 
+  },
+  { 
+    id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, 
+    variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] 
+  },
+  { 
+    id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, 
+    variants: [
+      { name: "Half", price: 260, desc: "3 pc, gravy" }, 
+      { name: "Full", price: 410, desc: "6 pc, gravy" }
+    ] 
+  },
 
   // --- BREADS & RICE ---
   { id: 401, category: "Breads & Rice", name: "Roti (Plain)", price: 15, isVeg: true, image: "/dishes/roti.avif" },
@@ -140,7 +185,6 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSetting
                 <ChefHat className="text-teal-600" /> Staff Dashboard
             </h2>
 
-            {/* LIVE CONTROLS */}
             <div className="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200">
                 <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-3">Restaurant Controls</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -214,7 +258,6 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
                         </div>
                         
                         <div className="flex flex-wrap gap-2">
-                            {/* If item has variants, show buttons for each variant */}
                             {item.variants ? (
                                 item.variants.map(v => {
                                     const variantId = `${item.id}-${v.name}`; // 103-Half
@@ -231,7 +274,6 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
                                     )
                                 })
                             ) : (
-                                // No variants, just main item ID
                                 (() => {
                                     const isUnavailable = storeSettings.unavailable?.includes(item.id.toString());
                                     return (
@@ -290,7 +332,7 @@ const BillView = ({ activeOrders, settleTable }) => {
                                     <h3 className="font-bold text-xl text-gray-800">
                                         {t.tableNo.toString().startsWith('PARCEL') ? t.tableNo : `Table ${t.tableNo}`}
                                     </h3>
-                                    <p className="text-xs text-gray-500">{t.orders.length} Tickets</p>
+                                    <p className="text-xs text-gray-500">{t.orders.length} Tickets Merged</p>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-3xl font-bold text-green-700">₹{t.totalAmount}</div>
@@ -314,7 +356,6 @@ const BillView = ({ activeOrders, settleTable }) => {
                                         {order.items.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center text-sm text-gray-700 mb-1">
                                                 <div className="flex items-center gap-2">
-                                                    {/* FIX: Double Naming Removed Here */}
                                                     <span>{item.qty} x {item.name}</span>
                                                 </div>
                                                 <span>₹{item.price * item.qty}</span>
@@ -340,7 +381,7 @@ const BillView = ({ activeOrders, settleTable }) => {
     );
 };
 
-// --- KITCHEN DISPLAY (NOW WITH EDIT CONTROLS) ---
+// --- KITCHEN DISPLAY ---
 const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder }) => {
   const [editMode, setEditMode] = useState(false);
   const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
@@ -409,10 +450,11 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
                           {item.qty}
                         </span>
                         <div>
-                          {/* FIX: Double Naming Removed Here */}
                           <p className={`font-medium ${item.isVeg !== false ? 'text-green-700' : 'text-red-700'}`}>
                             {item.name}
                           </p>
+                          {/* SHOW DESCRIPTION FOR KITCHEN STAFF TOO IF NEEDED */}
+                          {item.variant && <p className="text-[10px] text-gray-500">({item.variant})</p>}
                         </div>
                       </div>
                     </li>
@@ -445,31 +487,58 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
   );
 };
 
-const MenuCard = ({ item, addToCart, unavailable, unavailableVariants }) => {
+const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavailableVariants }) => {
   const [selectedVariant, setSelectedVariant] = useState(item.variants ? item.variants[0] : null);
 
+  const getCurrentId = () => {
+      if (selectedVariant) return `${item.id}-${selectedVariant.name}`;
+      return item.id.toString();
+  }
+
+  const currentId = getCurrentId();
+  const cartItem = cart.find(cartItem => cartItem.id === currentId);
+  const qty = cartItem ? cartItem.qty : 0;
+
+  const isVariantUnavailable = selectedVariant && unavailableVariants?.includes(currentId);
+  const isTrulyUnavailable = unavailable || isVariantUnavailable;
+
   const handleAdd = () => {
-    if(unavailable) return;
+    if(isTrulyUnavailable) return;
+    
+    let itemToAdd = item;
     if (selectedVariant) {
-        const variantItem = {
+        itemToAdd = {
             ...item,
-            id: `${item.id}-${selectedVariant.name}`,
-            // FIX: Ensure name is constructed cleanly once
+            id: currentId,
+            // FIX: Use item name cleanly, don't append variant if already appended in past
             name: `${item.name} (${selectedVariant.name})`,
             price: selectedVariant.price,
             variant: selectedVariant.name
         };
-        addToCart(variantItem);
-    } else {
-        addToCart(item);
     }
+    if (!item.variants) {
+        itemToAdd = { ...item, id: item.id.toString() };
+    }
+
+    addToCart(itemToAdd);
   };
 
+  const handleIncrement = () => {
+      updateQuantity(currentId, 1);
+  }
+
+  const handleDecrement = () => {
+      updateQuantity(currentId, -1);
+  }
+
+  // Determine which description to show
+  const currentDescription = selectedVariant ? selectedVariant.desc : item.description;
+
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${unavailable ? 'opacity-60 grayscale pointer-events-none' : ''}`}>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${isTrulyUnavailable ? 'opacity-75' : ''}`}>
         
-        {unavailable && (
-            <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+        {isTrulyUnavailable && (
+            <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center pointer-events-none">
                 <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold rounded shadow-lg transform -rotate-12">OUT OF STOCK</span>
             </div>
         )}
@@ -491,10 +560,14 @@ const MenuCard = ({ item, addToCart, unavailable, unavailableVariants }) => {
                     </div>
                 </div>
                 
+                {/* DISPLAY DESCRIPTION */}
+                {currentDescription && <p className="text-[10px] text-gray-500 mt-1 leading-tight">{currentDescription}</p>}
+                
                 {item.variants ? (
                     <div className="mt-2 flex flex-wrap gap-2">
                         {item.variants.map((v) => {
-                            const vUnavailable = unavailableVariants?.includes(`${item.id}-${v.name}`);
+                            const vId = `${item.id}-${v.name}`;
+                            const vUnavailable = unavailableVariants?.includes(vId);
                             return (
                                 <button 
                                     key={v.name}
@@ -515,13 +588,26 @@ const MenuCard = ({ item, addToCart, unavailable, unavailableVariants }) => {
                 <span className="font-bold text-teal-800">
                     ₹{selectedVariant ? selectedVariant.price : item.price}
                 </span>
-                <button 
-                    onClick={handleAdd}
-                    disabled={unavailable}
-                    className="bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-100 transition active:scale-95 flex items-center gap-1 border border-teal-200"
-                >
-                    ADD <Plus size={12} />
-                </button>
+                
+                {qty === 0 ? (
+                    <button 
+                        onClick={handleAdd}
+                        disabled={isTrulyUnavailable}
+                        className="bg-teal-50 text-teal-700 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-100 transition active:scale-95 flex items-center gap-1 border border-teal-200 shadow-sm"
+                    >
+                        ADD <Plus size={12} />
+                    </button>
+                ) : (
+                    <div className="flex items-center bg-teal-600 rounded-lg text-white font-bold text-xs shadow-md">
+                        <button onClick={handleDecrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-l-lg transition active:bg-teal-800">
+                            <Minus size={12} />
+                        </button>
+                        <span className="px-1">{qty}</span>
+                        <button onClick={handleIncrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-r-lg transition active:bg-teal-800">
+                            <Plus size={12} />
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     </div>
@@ -540,12 +626,32 @@ const App = () => {
   const [isStaff, setIsStaff] = useState(false);
   const [orderNote, setOrderNote] = useState('');
   
-  // STORE SETTINGS STATE
   const [storeSettings, setStoreSettings] = useState({ rushMode: false, isOpen: true, unavailable: [] });
 
   const audioRef = useRef(null);
   const prevPendingCount = useRef(0);
 
+  // --- NAVIGATION (HISTORY) ---
+  const changeView = (newView) => {
+      window.history.pushState({ view: newView }, '');
+      setView(newView);
+  };
+
+  useEffect(() => {
+      const handlePopState = (event) => {
+          if (event.state && event.state.view) {
+              setView(event.state.view);
+          } else {
+              // Fallback logic if history is empty (e.g. user refreshed)
+              // We re-evaluate currentTable logic just in case
+              // But usually this handles the "Back" press
+          }
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // INITIALIZATION
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
@@ -558,13 +664,15 @@ const App = () => {
         }
         setIsStaff(false);
         setView('menu');
+        window.history.replaceState({ view: 'menu' }, ''); // Replace initial history
     } else {
         setIsStaff(false);
         setView('login');
+        window.history.replaceState({ view: 'login' }, '');
     }
   }, []);
 
-  // LISTEN TO SETTINGS
+  // SETTINGS LISTENER
   useEffect(() => {
       const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
           if (doc.exists()) {
@@ -576,7 +684,7 @@ const App = () => {
       return () => unsub();
   }, []);
 
-  // LISTEN TO ORDERS
+  // ORDERS LISTENER
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -628,11 +736,11 @@ const App = () => {
       });
       setCart([]);
       setOrderNote('');
-      setView('success');
+      changeView('success'); // Use history push
       
       if(isStaff) {
           setTimeout(() => {
-              setView('staff-dashboard');
+              changeView('staff-dashboard');
               setCurrentTable(null);
           }, 2000);
       }
@@ -693,7 +801,6 @@ const App = () => {
       }
   };
 
-  // ADMIN CONTROLS
   const updateSettings = async (key, value) => {
       setStoreSettings(prev => ({...prev, [key]: value})); 
       await updateDoc(doc(db, "settings", "store"), { [key]: value });
@@ -713,7 +820,7 @@ const App = () => {
   const handleLogin = () => {
       if(kitchenPassword === '1234') { 
           setIsStaff(true);
-          setView('staff-dashboard');
+          changeView('staff-dashboard');
           setKitchenPassword('');
       } else {
           alert("Wrong Password!");
@@ -722,7 +829,7 @@ const App = () => {
 
   const handleLogout = () => {
       setIsStaff(false);
-      setView('login');
+      changeView('login');
       setCurrentTable(null);
   };
 
@@ -756,21 +863,21 @@ const App = () => {
   if (view === 'staff-dashboard') return (
       <>
         <audio ref={audioRef} src="/bell.wav" preload="auto" />
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <StaffDashboard setView={setView} setCurrentTable={setCurrentTable} storeSettings={storeSettings} updateSettings={updateSettings} />
+        <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <StaffDashboard setView={changeView} setCurrentTable={setCurrentTable} storeSettings={storeSettings} updateSettings={updateSettings} />
       </>
   );
 
   if (view === 'manage-menu') return (
       <>
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <ManageMenuView setView={setView} storeSettings={storeSettings} toggleStock={toggleStock} />
+        <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <ManageMenuView setView={changeView} storeSettings={storeSettings} toggleStock={toggleStock} />
       </>
   );
 
   if (view === 'bills') return (
       <>
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
         <BillView activeOrders={activeOrders} settleTable={settleTable} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} />
       </>
   );
@@ -778,7 +885,7 @@ const App = () => {
   if (view === 'kitchen') return (
      <>
         <audio ref={audioRef} src="/bell.wav" preload="auto" />
-        <Header view={view} setView={setView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
         <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} />
      </>
   );
@@ -799,7 +906,7 @@ const App = () => {
   // MENU
   if (view === 'menu') return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
-      <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
+      <Header view={view} setView={changeView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
       <main className="pt-4 max-w-4xl mx-auto px-4 pb-20">
         {isStaff && (
             <div className="bg-orange-100 border-l-4 border-orange-500 p-3 mb-4 rounded shadow-sm flex justify-between items-center">
@@ -807,7 +914,7 @@ const App = () => {
                     <p className="font-bold text-orange-800 text-sm">Waiter Mode Active</p>
                     <p className="text-xs text-orange-700">Taking order for {currentTable}</p>
                 </div>
-                <button onClick={() => setView('staff-dashboard')} className="text-xs bg-white px-3 py-1 rounded border border-orange-200">Cancel</button>
+                <button onClick={() => changeView('staff-dashboard')} className="text-xs bg-white px-3 py-1 rounded border border-orange-200">Cancel</button>
             </div>
         )}
         
@@ -836,7 +943,9 @@ const App = () => {
                             <MenuCard 
                                 key={item.id} 
                                 item={item} 
-                                addToCart={addToCart} 
+                                cart={cart}
+                                addToCart={addToCart}
+                                updateQuantity={updateQuantity}
                                 unavailable={isMainUnavailable}
                                 unavailableVariants={storeSettings.unavailable || []}
                             />
@@ -850,7 +959,7 @@ const App = () => {
         {cart.length > 0 && (
             <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
                 <button 
-                    onClick={() => setView('cart')}
+                    onClick={() => changeView('cart')}
                     className="bg-teal-800 text-white px-8 py-3 rounded-full shadow-2xl font-bold flex items-center gap-3 animate-bounce hover:bg-teal-900 transition border-2 border-white"
                 >
                     <span>{cart.reduce((a, b) => a + b.qty, 0)} Items</span>
@@ -867,9 +976,9 @@ const App = () => {
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
       return (
         <div className="min-h-screen bg-gray-50">
-           <Header view={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
+           <Header view={view} setView={changeView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
            <div className="max-w-xl mx-auto p-4">
-                <button onClick={() => setView('menu')} className="flex items-center text-gray-500 mb-6 hover:text-teal-600 font-medium">
+                <button onClick={() => changeView('menu')} className="flex items-center text-gray-500 mb-6 hover:text-teal-600 font-medium">
                 <ArrowLeft size={18} className="mr-1" /> Back to Menu
                 </button>
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-gray-800">
@@ -940,7 +1049,7 @@ const App = () => {
                 ? "New ticket added to Kitchen Display." 
                 : "Sit back! Food is coming."}
         </p>
-        <button onClick={() => isStaff ? setView('staff-dashboard') : setView('menu')} className="text-teal-600 font-bold hover:underline">
+        <button onClick={() => isStaff ? changeView('staff-dashboard') : changeView('menu')} className="text-teal-600 font-bold hover:underline">
             {isStaff ? 'Back to Dashboard' : 'Order More Items'}
         </button>
       </div>
