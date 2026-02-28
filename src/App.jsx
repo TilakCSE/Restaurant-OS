@@ -44,7 +44,7 @@ const MENU_ITEMS = [
 
   // --- MAIN COURSE ---
   { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }] },
-  { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, variants: [{ name: "Half", price: 160, desc: "2 thigh, thick gravy" }, { name: "Full", price: 250, desc: "1 leg, 2 thigh, thick gravy" }] },
+  { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 180, variants: [{ name: "Half", price: 180, desc: "2 thigh, thick gravy" }, { name: "Full", price: 270, desc: "1 leg, 2 thigh, thick gravy" }] },
   { id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif", description: "6 pc boneless, gravy" },
   { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", description: "2 pc, gravy" },
   { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", description: "12 pc, gravy" },
