@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle } from 'lucide-react';
+import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, Calendar, DollarSign, BarChart3 } from 'lucide-react';
 
-// --- FIREBASE CONFIGURATION ---
-
-
-
+// --- FIREBASE CONFIG ---
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.VITE_AUTH_DOMAIN,
@@ -17,81 +14,42 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_MEASUREMENT_ID
 };
 
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // --- MENU DATA ---
-// Added 'desc' for variants and 'description' for main items
 const MENU_ITEMS = [
   // --- STARTERS ---
   { id: 101, category: "Starters", name: "Fish Fry (01 pc)", price: 90, isVeg: false, image: "/dishes/fish-fry.avif" },
   { id: 102, category: "Starters", name: "Egg Boil Fry (2 eggs)", price: 60, isVeg: false, image: "/dishes/egg-fry.avif" },
-  { 
-    id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, 
-    variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] 
-  },
-  { 
-    id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, 
-    variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] 
-  },
-  { 
-    id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" 
-  },
-  { 
-    id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, 
-    variants: [{ name: "Half (4pcs)", price: 150 }, { name: "Full (8pcs)", price: 240 }] 
-  },
+  { id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
+  { id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
+  { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" },
+  { id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, variants: [{ name: "Half (4pcs)", price: 150 }, { name: "Full (8pcs)", price: 240 }] },
 
   // --- EGG SPECIALS ---
   { id: 201, category: "Egg Specials", name: "Omelette (2 Eggs)", price: 70, isVeg: false, image: "/dishes/omelette.avif" },
-  { id: 202, category: "Egg Specials", name: "Egg Bhurji (2 Eggs)", price: 100, isVeg: false, image: "/dishes/egg-bhurji.avif" },
-  { id: 203, category: "Egg Specials", name: "Egg Pulao", price: 120, isVeg: false, image: "/dishes/egg-pulao.avif" },
-  { id: 204, category: "Egg Specials", name: "Boil Tikka Masala (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
-  { id: 206, category: "Egg Specials", name: "Egg Curry (2 Eggs)", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
+  { id: 202, category: "Egg Specials", name: "Chicken Rassa Omelette", price: 100, isVeg: false, image: "/dishes/chicken-rassa-omelette.avif" },
+  { id: 203, category: "Egg Specials", name: "Mutton Rassa Omelette", price: 120, isVeg: false, image: "/dishes/mutton-rassa-omelette.avif" },
+  { id: 204, category: "Egg Specials", name: "Egg Bhurji (2 Eggs)", price: 100, isVeg: false, image: "/dishes/egg-bhurji.avif" },
+  { id: 208, category: "Egg Specials", name: "Boil Bhurji (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-bhurji.avif" },
+  { id: 205, category: "Egg Specials", name: "Egg Pulao", price: 120, isVeg: false, image: "/dishes/egg-pulao.avif" },
+  { id: 206, category: "Egg Specials", name: "Boil Tikka Masala (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
+  { id: 207, category: "Egg Specials", name: "Egg Curry (2 Eggs)", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
 
-  // --- THALI (Lunch Only: 12:30 - 3:00 PM) ---
+  // --- THALI ---
   { id: 501, category: "Lunch Specials (Thali)", name: "Chicken Thali", price: 170, isVeg: false, image: "/dishes/chicken-thali.avif", isLunchOnly: true },
   { id: 502, category: "Lunch Specials (Thali)", name: "Egg Thali", price: 170, isVeg: false, image: "/dishes/egg-thali.avif", isLunchOnly: true },
+  { id: 503, category: "Lunch Specials (Thali)", name: "Fish Thali", price: 200, isVeg: false, image: "/dishes/fish-thali.jpg", isLunchOnly: true },
 
   // --- MAIN COURSE ---
-  { 
-    id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, 
-    variants: [
-      { name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, 
-      { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }
-    ] 
-  },
-  { 
-    id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, 
-    variants: [
-      { name: "Half", price: 160, desc: "2 thigh, thick gravy" }, 
-      { name: "Full", price: 250, desc: "1 leg, 2 thigh, thick gravy" }
-    ] 
-  },
-  { 
-    id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif", 
-    description: "6 pc boneless, gravy" 
-  },
-  { 
-    id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", 
-    description: "2 pc, gravy" 
-  },
-  { 
-    id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", 
-    description: "12 pc, gravy" 
-  },
-  { 
-    id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, 
-    variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] 
-  },
-  { 
-    id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, 
-    variants: [
-      { name: "Half", price: 260, desc: "3 pc, gravy" }, 
-      { name: "Full", price: 410, desc: "6 pc, gravy" }
-    ] 
-  },
+  { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }] },
+  { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 160, variants: [{ name: "Half", price: 160, desc: "2 thigh, thick gravy" }, { name: "Full", price: 250, desc: "1 leg, 2 thigh, thick gravy" }] },
+  { id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif", description: "6 pc boneless, gravy" },
+  { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", description: "2 pc, gravy" },
+  { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", description: "12 pc, gravy" },
+  { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] },
+  { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, variants: [{ name: "Half", price: 260, desc: "3 pc, gravy" }, { name: "Full", price: 410, desc: "6 pc, gravy" }] },
 
   // --- BREADS & RICE ---
   { id: 401, category: "Breads & Rice", name: "Roti (Plain)", price: 15, isVeg: true, image: "/dishes/roti.avif" },
@@ -109,7 +67,6 @@ const MENU_ITEMS = [
 
 const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, storeSettings }) => (
   <header className="bg-teal-800 text-white shadow-lg sticky top-0 z-50">
-    {/* ALERTS: CLOSED or RUSH */}
     {!storeSettings?.isOpen ? (
         <div className="bg-gray-800 text-white text-xs md:text-sm font-bold p-3 text-center flex items-center justify-center gap-2">
             <Ban size={16} /> RESTAURANT IS CLOSED
@@ -138,7 +95,7 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, store
         {isStaff ? (
              <>
                {view !== 'staff-dashboard' && (
-                 <button onClick={() => setView('staff-dashboard')} className="text-xs bg-teal-900 px-3 py-1.5 rounded border border-teal-600">
+                 <button onClick={() => setView('staff-dashboard')} className="text-xs bg-teal-900 px-3 py-1.5 rounded border border-teal-600 font-bold hover:bg-teal-700">
                     Dashboard
                  </button>
                )}
@@ -147,10 +104,7 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, store
                </button>
              </>
         ) : (
-          <button 
-            onClick={() => setView('cart')}
-            className="relative p-2 hover:bg-teal-700 rounded-full transition"
-          >
+          <button onClick={() => setView('cart')} className="relative p-2 hover:bg-teal-700 rounded-full transition">
             <ShoppingCart className="h-6 w-6" />
             {cartCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-yellow-400 text-teal-900 text-xs font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-teal-800">
@@ -212,6 +166,12 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSetting
             </div>
 
             <div className="grid gap-4 max-w-md mx-auto">
+                {/* NEW REPORTS BUTTON */}
+                <button onClick={() => setView('reports')} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-600 flex items-center justify-between hover:bg-purple-50">
+                    <div className="text-left"><h3 className="font-bold text-xl text-gray-800">Analytics & Reports</h3><p className="text-sm text-gray-500">Revenue & Order History</p></div>
+                    <TrendingUp className="text-purple-600" size={32} />
+                </button>
+
                 <button onClick={() => setView('kitchen')} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-teal-600 flex items-center justify-between hover:bg-teal-50">
                     <div className="text-left"><h3 className="font-bold text-xl text-gray-800">Kitchen Display</h3><p className="text-sm text-gray-500">Live KDS & Edits</p></div>
                     <Store className="text-teal-600" size={32} />
@@ -238,7 +198,140 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSetting
     );
 };
 
-// --- GRANULAR STOCK MANAGEMENT (Half/Full) ---
+// --- REPORTS DASHBOARD ---
+const ReportView = ({ allOrders, setView }) => {
+    const [filter, setFilter] = useState('today'); // today, week, month
+    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, pendingValue: 0, itemsSold: 0 });
+    const [filteredOrders, setFilteredOrders] = useState([]);
+
+    useEffect(() => {
+        const now = new Date();
+        let startTime = 0;
+
+        if (filter === 'today') {
+            startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        } else if (filter === 'week') {
+            const firstDay = now.getDate() - now.getDay(); 
+            startTime = new Date(now.getFullYear(), now.getMonth(), firstDay).getTime();
+        } else if (filter === 'month') {
+            startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        }
+
+        // Filter orders based on timestamp
+        const relevantOrders = allOrders.filter(order => {
+            const orderTime = order.createdAt?.seconds ? order.createdAt.seconds * 1000 : Date.now();
+            return orderTime >= startTime;
+        });
+
+        // Calculate Stats
+        let rev = 0;
+        let pValue = 0;
+        let iSold = 0;
+        
+        relevantOrders.forEach(order => {
+            if (order.status === 'paid') {
+                rev += order.totalAmount;
+                order.items.forEach(i => iSold += i.qty);
+            } else {
+                pValue += order.totalAmount;
+            }
+        });
+
+        // Sort for table display (newest first), but only show settled bills
+        const settled = relevantOrders.filter(o => o.status === 'paid').sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
+
+        setStats({ revenue: rev, orderCount: relevantOrders.length, pendingValue: pValue, itemsSold: iSold });
+        setFilteredOrders(settled);
+
+    }, [filter, allOrders]);
+
+    return (
+        <div className="max-w-4xl mx-auto p-4 pb-24">
+            <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition"><ArrowLeft size={20}/></button>
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><TrendingUp className="text-purple-600"/> Analytics Dashboard</h2>
+                    <p className="text-sm text-gray-500">Track revenue and order history</p>
+                </div>
+            </div>
+
+            {/* FILTERS */}
+            <div className="flex bg-gray-200 p-1 rounded-lg mb-6">
+                {['today', 'week', 'month'].map(f => (
+                    <button 
+                        key={f} 
+                        onClick={() => setFilter(f)} 
+                        className={`flex-1 py-2 text-sm font-bold rounded-md capitalize transition ${filter === f ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
+                    >
+                        {f}
+                    </button>
+                ))}
+            </div>
+
+            {/* KEY METRICS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
+                    <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
+                    <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
+                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
+                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
+                    <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
+                    <h3 className="text-2xl font-extrabold text-orange-800">₹{stats.pendingValue}</h3>
+                    <p className="text-[10px] text-orange-600 mt-1">From un-settled tables</p>
+                </div>
+            </div>
+
+            {/* ORDER HISTORY TABLE */}
+            <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Settled Bills History ({filteredOrders.length})</h3>
+            
+            {filteredOrders.length === 0 ? (
+                <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
+                    No settled bills found for this time period.
+                </div>
+            ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-600 text-sm">
+                                    <th className="p-3 border-b">Time</th>
+                                    <th className="p-3 border-b">Order ID</th>
+                                    <th className="p-3 border-b">Table</th>
+                                    <th className="p-3 border-b">Items</th>
+                                    <th className="p-3 border-b text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredOrders.map(order => (
+                                    <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                        <td className="p-3 text-sm text-gray-600">
+                                            {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
+                                        </td>
+                                        <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
+                                        <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
+                                        <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
+                                            {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                                        </td>
+                                        <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
     return (
         <div className="max-w-2xl mx-auto p-4 pb-24">
@@ -260,7 +353,7 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
                         <div className="flex flex-wrap gap-2">
                             {item.variants ? (
                                 item.variants.map(v => {
-                                    const variantId = `${item.id}-${v.name}`; // 103-Half
+                                    const variantId = `${item.id}-${v.name}`; 
                                     const isUnavailable = storeSettings.unavailable?.includes(variantId);
                                     return (
                                         <button 
@@ -294,10 +387,10 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
     );
 };
 
-// --- BILL VIEW ---
 const BillView = ({ activeOrders, settleTable }) => {
     const tables = {};
     
+    // Group active orders by table
     activeOrders.forEach(order => {
         const table = order.tableNo;
         if (!tables[table]) tables[table] = { tableNo: table, totalAmount: 0, orders: [] };
@@ -381,8 +474,7 @@ const BillView = ({ activeOrders, settleTable }) => {
     );
 };
 
-// --- KITCHEN DISPLAY ---
-const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder }) => {
+const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder, editTableNumber }) => {
   const [editMode, setEditMode] = useState(false);
   const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
 
@@ -419,8 +511,16 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
               
               <div className="bg-gray-50 p-4 border-b">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-bold text-xl text-gray-800">
+                  {/* EDIT TABLE BUTTON IMPLEMENTED HERE */}
+                  <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
                     {order.tableNo.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${order.tableNo}`}
+                    <button 
+                        onClick={() => editTableNumber(order.id, order.tableNo)} 
+                        className="text-gray-400 hover:text-blue-600 p-1 bg-white rounded shadow-sm border border-gray-200"
+                        title="Edit Table Number"
+                    >
+                        <Edit size={14} />
+                    </button>
                   </h3>
                   <span className="text-xs text-gray-500 font-mono">
                     #{order.id.slice(-4)}
@@ -453,7 +553,6 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
                           <p className={`font-medium ${item.isVeg !== false ? 'text-green-700' : 'text-red-700'}`}>
                             {item.name}
                           </p>
-                          {/* SHOW DESCRIPTION FOR KITCHEN STAFF TOO IF NEEDED */}
                           {item.variant && <p className="text-[10px] text-gray-500">({item.variant})</p>}
                         </div>
                       </div>
@@ -510,7 +609,6 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
         itemToAdd = {
             ...item,
             id: currentId,
-            // FIX: Use item name cleanly, don't append variant if already appended in past
             name: `${item.name} (${selectedVariant.name})`,
             price: selectedVariant.price,
             variant: selectedVariant.name
@@ -523,20 +621,13 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
     addToCart(itemToAdd);
   };
 
-  const handleIncrement = () => {
-      updateQuantity(currentId, 1);
-  }
+  const handleIncrement = () => updateQuantity(currentId, 1);
+  const handleDecrement = () => updateQuantity(currentId, -1);
 
-  const handleDecrement = () => {
-      updateQuantity(currentId, -1);
-  }
-
-  // Determine which description to show
   const currentDescription = selectedVariant ? selectedVariant.desc : item.description;
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${isTrulyUnavailable ? 'opacity-75' : ''}`}>
-        
         {isTrulyUnavailable && (
             <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center pointer-events-none">
                 <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold rounded shadow-lg transform -rotate-12">OUT OF STOCK</span>
@@ -544,12 +635,7 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
         )}
 
         <div className="w-28 h-auto md:w-32 md:h-auto relative flex-shrink-0 bg-gray-100">
-            <img 
-                src={item.image} 
-                alt={item.name} 
-                className="w-full h-full object-cover"
-                onError={(e) => {e.target.src = 'https://placehold.co/100x100?text=PC'}} 
-            />
+            <img src={item.image} alt={item.name} className="w-full h-full object-cover" onError={(e) => {e.target.src = 'https://placehold.co/100x100?text=PC'}} />
         </div>
         <div className="p-3 flex flex-col flex-grow justify-between">
             <div>
@@ -559,8 +645,6 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
                         <div className={`w-full h-full rounded-full ${item.isVeg !== false ? 'bg-green-600' : 'bg-red-600'}`}></div>
                     </div>
                 </div>
-                
-                {/* DISPLAY DESCRIPTION */}
                 {currentDescription && <p className="text-[10px] text-gray-500 mt-1 leading-tight">{currentDescription}</p>}
                 
                 {item.variants ? (
@@ -585,27 +669,16 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
             </div>
             
             <div className="flex justify-between items-end mt-2">
-                <span className="font-bold text-teal-800">
-                    ₹{selectedVariant ? selectedVariant.price : item.price}
-                </span>
-                
+                <span className="font-bold text-teal-800">₹{selectedVariant ? selectedVariant.price : item.price}</span>
                 {qty === 0 ? (
-                    <button 
-                        onClick={handleAdd}
-                        disabled={isTrulyUnavailable}
-                        className="bg-teal-50 text-teal-700 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-100 transition active:scale-95 flex items-center gap-1 border border-teal-200 shadow-sm"
-                    >
+                    <button onClick={handleAdd} disabled={isTrulyUnavailable} className="bg-teal-50 text-teal-700 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-100 transition active:scale-95 flex items-center gap-1 border border-teal-200 shadow-sm">
                         ADD <Plus size={12} />
                     </button>
                 ) : (
                     <div className="flex items-center bg-teal-600 rounded-lg text-white font-bold text-xs shadow-md">
-                        <button onClick={handleDecrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-l-lg transition active:bg-teal-800">
-                            <Minus size={12} />
-                        </button>
+                        <button onClick={handleDecrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-l-lg transition active:bg-teal-800"><Minus size={12} /></button>
                         <span className="px-1">{qty}</span>
-                        <button onClick={handleIncrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-r-lg transition active:bg-teal-800">
-                            <Plus size={12} />
-                        </button>
+                        <button onClick={handleIncrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-r-lg transition active:bg-teal-800"><Plus size={12} /></button>
                     </div>
                 )}
             </div>
@@ -619,19 +692,23 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
 const App = () => {
   const [view, setView] = useState('loading'); 
   const [cart, setCart] = useState([]);
-  const [activeOrders, setActiveOrders] = useState([]); 
+  
+  // Now stores ALL orders to calculate reports, activeOrders is derived below
+  const [allOrders, setAllOrders] = useState([]); 
+  
   const [currentTable, setCurrentTable] = useState(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [kitchenPassword, setKitchenPassword] = useState('');
   const [isStaff, setIsStaff] = useState(false);
   const [orderNote, setOrderNote] = useState('');
-  
   const [storeSettings, setStoreSettings] = useState({ rushMode: false, isOpen: true, unavailable: [] });
 
   const audioRef = useRef(null);
   const prevPendingCount = useRef(0);
 
-  // --- NAVIGATION (HISTORY) ---
+  // Derive active orders from all orders (filters out 'paid')
+  const activeOrders = allOrders.filter(o => o.status !== 'paid');
+
   const changeView = (newView) => {
       window.history.pushState({ view: newView }, '');
       setView(newView);
@@ -639,19 +716,12 @@ const App = () => {
 
   useEffect(() => {
       const handlePopState = (event) => {
-          if (event.state && event.state.view) {
-              setView(event.state.view);
-          } else {
-              // Fallback logic if history is empty (e.g. user refreshed)
-              // We re-evaluate currentTable logic just in case
-              // But usually this handles the "Back" press
-          }
+          if (event.state && event.state.view) setView(event.state.view);
       };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // INITIALIZATION
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
@@ -664,7 +734,7 @@ const App = () => {
         }
         setIsStaff(false);
         setView('menu');
-        window.history.replaceState({ view: 'menu' }, ''); // Replace initial history
+        window.history.replaceState({ view: 'menu' }, '');
     } else {
         setIsStaff(false);
         setView('login');
@@ -672,20 +742,16 @@ const App = () => {
     }
   }, []);
 
-  // SETTINGS LISTENER
   useEffect(() => {
       const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
-          if (doc.exists()) {
-              setStoreSettings(doc.data());
-          } else {
-              setDoc(doc.ref, { rushMode: false, isOpen: true, unavailable: [] });
-          }
+          if (doc.exists()) setStoreSettings(doc.data());
+          else setDoc(doc.ref, { rushMode: false, isOpen: true, unavailable: [] });
       });
       return () => unsub();
   }, []);
 
-  // ORDERS LISTENER
   useEffect(() => {
+    // Listen to ALL orders, sorted newest first
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map(doc => ({
@@ -693,9 +759,9 @@ const App = () => {
         ...doc.data()
       }));
       
-      const liveOrders = orders.filter(o => o.status !== 'paid');
-      setActiveOrders(liveOrders);
+      setAllOrders(orders);
 
+      const liveOrders = orders.filter(o => o.status !== 'paid');
       const pendingCount = liveOrders.filter(o => o.status === 'pending').length;
       if (pendingCount > prevPendingCount.current) {
           if(audioRef.current) audioRef.current.play().catch(e => console.log("Audio play failed:", e));
@@ -736,7 +802,7 @@ const App = () => {
       });
       setCart([]);
       setOrderNote('');
-      changeView('success'); // Use history push
+      changeView('success');
       
       if(isStaff) {
           setTimeout(() => {
@@ -756,6 +822,20 @@ const App = () => {
         await updateDoc(doc(db, "orders", orderId), { status: newStatus });
       } catch (error) {
         console.error("Error:", error);
+      }
+  };
+
+  // NEW FEATURE: Edit Table Number
+  const editTableNumber = async (orderId, currentTableVal) => {
+      const newTable = window.prompt("Change table number to:", currentTableVal);
+      // Ensure they didn't hit cancel, and they actually typed a new number
+      if (newTable && newTable.trim() !== "" && newTable.trim() !== currentTableVal) {
+          try {
+              await updateDoc(doc(db, "orders", orderId), { tableNo: newTable.trim() });
+          } catch (error) {
+              console.error("Error updating table number:", error);
+              alert("Failed to update table number.");
+          }
       }
   };
 
@@ -833,7 +913,7 @@ const App = () => {
       setCurrentTable(null);
   };
 
-  // --- VIEWS ---
+  // --- VIEWS ROUTING ---
   if (view === 'loading') return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold">Loading PC's Kitchen...</div>;
 
   if (view === 'login') return (
@@ -868,6 +948,13 @@ const App = () => {
       </>
   );
 
+  if (view === 'reports') return (
+      <>
+        <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
+        <ReportView allOrders={allOrders} setView={changeView} />
+      </>
+  );
+
   if (view === 'manage-menu') return (
       <>
         <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
@@ -886,11 +973,10 @@ const App = () => {
      <>
         <audio ref={audioRef} src="/bell.wav" preload="auto" />
         <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} />
+        <KitchenDisplay activeOrders={activeOrders} updateOrderStatus={updateOrderStatus} deleteOrder={deleteOrder} deleteItemFromOrder={deleteItemFromOrder} editTableNumber={editTableNumber} />
      </>
   );
 
-  // CHECK IF RESTAURANT IS CLOSED
   if (!isStaff && storeSettings?.isOpen === false) return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-8 text-center text-white">
           <Ban size={64} className="text-red-500 mb-6" />
@@ -903,7 +989,6 @@ const App = () => {
       </div>
   );
 
-  // MENU
   if (view === 'menu') return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
       <Header view={view} setView={changeView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
@@ -919,7 +1004,6 @@ const App = () => {
         )}
         
         {["Lunch Specials (Thali)", "Starters", "Egg Specials", "Main Course", "Breads & Rice", "Beverages"].map(cat => {
-            // TIME FILTER FOR THALI
             if (cat === "Lunch Specials (Thali)") {
                 const now = new Date();
                 const minutes = now.getHours() * 60 + now.getMinutes();
