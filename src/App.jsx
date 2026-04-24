@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, Calendar, DollarSign, BarChart3 } from 'lucide-react';
+import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, DollarSign, BarChart3, Search, Moon, Sun, Flame } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- FIREBASE CONFIG ---
 const firebaseConfig = {
@@ -63,6 +64,8 @@ const MENU_ITEMS = [
   { id: 601, category: "Beverages", name: "Mineral Water", price: 10, isVeg: true, image: "/dishes/water.avif" },
 ];
 
+const CATEGORIES = ["Lunch Specials (Thali)", "Starters", "Egg Specials", "Main Course", "Breads & Rice", "Beverages"];
+
 // --- COMPONENTS ---
 
 const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, storeSettings }) => (
@@ -73,8 +76,7 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, store
         </div>
     ) : storeSettings?.rushMode && (
         <div className="bg-red-600 text-white text-xs md:text-sm font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse">
-            <AlertTriangle size={16} /> 
-            RUSH MODE: Orders may take longer than usual.
+            <AlertTriangle size={16} /> RUSH MODE: Orders may take longer than usual.
         </div>
     )}
     
@@ -106,17 +108,297 @@ const Header = ({ view, setView, cartCount, currentTable, isStaff, logout, store
         ) : (
           <button onClick={() => setView('cart')} className="relative p-2 hover:bg-teal-700 rounded-full transition">
             <ShoppingCart className="h-6 w-6" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-yellow-400 text-teal-900 text-xs font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-teal-800">
-                {cartCount}
-              </span>
-            )}
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span 
+                  initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                  className="absolute -top-1 -right-1 bg-yellow-400 text-teal-900 text-xs font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-teal-800"
+                >
+                  {cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
         )}
       </div>
     </div>
   </header>
 );
+
+const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder, editTableNumber }) => {
+  const [editMode, setEditMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  
+  const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
+
+  const getChefSummary = () => {
+      const counts = {};
+      kitchenOrders.forEach(order => {
+          order.items.forEach(item => {
+              counts[item.name] = (counts[item.name] || 0) + item.qty;
+          });
+      });
+      return Object.entries(counts).sort((a,b) => b[1] - a[1]);
+  };
+
+  const chefSummary = getChefSummary();
+
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
+      <div className="max-w-6xl mx-auto p-4 pb-24">
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="flex items-center gap-2">
+              <Store className={isDarkMode ? "text-teal-400" : "text-teal-600"} size={28} /> 
+              <h2 className="text-2xl font-bold">Kitchen Display</h2>
+          </div>
+          
+          <div className="flex gap-2 w-full md:w-auto">
+              <button 
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className={`p-2 rounded-lg font-bold flex items-center justify-center ${isDarkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
+              >
+                  {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
+              </button>
+              <button 
+                  onClick={() => setEditMode(!editMode)}
+                  className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 ${editMode ? 'bg-orange-600 text-white' : (isDarkMode ? 'bg-gray-700' : 'bg-gray-200')}`}
+              >
+                  {editMode ? <><X size={16}/> DONE EDITING</> : <><Edit size={16}/> EDIT TICKET</>}
+              </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+            <button 
+                onClick={() => setShowSummary(!showSummary)} 
+                className={`w-full flex items-center justify-between p-4 rounded-xl shadow-sm font-bold ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
+            >
+                <span className="flex items-center gap-2"><Flame className="text-orange-500"/> Chef's Aggregated Summary</span>
+                <span>{showSummary ? <Minus size={20}/> : <Plus size={20}/>}</span>
+            </button>
+            <AnimatePresence>
+                {showSummary && (
+                    <motion.div 
+                        initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className={`mt-2 p-4 rounded-xl flex flex-wrap gap-3 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                            {chefSummary.length === 0 ? <p className="text-gray-500">No items cooking.</p> : 
+                             chefSummary.map(([name, qty]) => (
+                                <span key={name} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${isDarkMode ? 'bg-teal-900/50 text-teal-300' : 'bg-teal-50 text-teal-800 border border-teal-100'}`}>
+                                    {qty}x {name}
+                                </span>
+                             ))
+                            }
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+
+        {kitchenOrders.length === 0 ? (
+          <div className={`text-center py-20 rounded-xl border-2 border-dashed ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-white border-gray-300 text-gray-500'}`}>
+            <ChefHat className="mx-auto h-16 w-16 mb-4 opacity-50" />
+            <p className="text-lg">Kitchen is clear!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AnimatePresence>
+                {kitchenOrders.map((order) => (
+                <motion.div 
+                    layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                    key={order.id} 
+                    className={`rounded-xl shadow-lg border-l-8 overflow-hidden relative ${order.tableNo.toString().startsWith('PARCEL') ? 'border-yellow-400' : 'border-teal-500'} ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}
+                >
+                    <div className={`p-4 border-b ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-xl flex items-center gap-2">
+                        {order.tableNo.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${order.tableNo}`}
+                        <button onClick={() => editTableNumber(order.id, order.tableNo)} className={`p-1 rounded ${isDarkMode ? 'bg-gray-700 hover:text-teal-400' : 'bg-white hover:text-blue-600 shadow-sm border border-gray-200'}`}>
+                            <Edit size={14} />
+                        </button>
+                        </h3>
+                        <span className={`text-xs font-mono ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>#{order.id.slice(-4)}</span>
+                    </div>
+                    {order.note && (
+                        <div className={`p-2 rounded text-sm font-bold border ${isDarkMode ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                            NOTE: {order.note}
+                        </div>
+                    )}
+                    </div>
+                    
+                    <div className="p-4 max-h-64 overflow-y-auto">
+                    <ul className="space-y-3">
+                        {order.items.map((item, idx) => (
+                        <li key={idx} className={`flex justify-between items-center border-b border-dashed pb-2 last:border-0 last:pb-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                            <div className="flex gap-3 items-center">
+                            {editMode && (
+                                <button onClick={() => deleteItemFromOrder(order, idx)} className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition"><Trash2 size={20} /></button>
+                            )}
+                            <span className={`font-bold h-8 w-8 flex items-center justify-center rounded-lg text-sm border shadow-sm ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-100 border-gray-200 text-gray-800'}`}>
+                                {item.qty}
+                            </span>
+                            <div>
+                                <p className={`font-medium ${item.isVeg !== false ? (isDarkMode ? 'text-green-400' : 'text-green-700') : (isDarkMode ? 'text-red-400' : 'text-red-700')}`}>
+                                {item.name}
+                                </p>
+                                {item.variant && <p className={`text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>({item.variant})</p>}
+                            </div>
+                            </div>
+                        </li>
+                        ))}
+                    </ul>
+                    </div>
+
+                    <div className={`p-4 border-t ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50'}`}>
+                    {editMode ? (
+                        <button onClick={() => deleteOrder(order.id)} className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition flex justify-center items-center gap-2 shadow-md">
+                            <Trash2 size={20} /> CANCEL ENTIRE TICKET
+                        </button>
+                    ) : (
+                        <button onClick={() => updateOrderStatus(order.id, 'served')} className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-md active:scale-95">
+                            <Utensils size={18} /> Mark Served
+                        </button>
+                    )}
+                    </div>
+                </motion.div>
+                ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ReportView = ({ allOrders, setView }) => {
+    const [filter, setFilter] = useState('today'); 
+    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, pendingValue: 0, itemsSold: 0 });
+    const [filteredOrders, setFilteredOrders] = useState([]);
+
+    useEffect(() => {
+        const now = new Date();
+        let startTime = 0;
+
+        if (filter === 'today') {
+            startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        } else if (filter === 'week') {
+            const firstDay = now.getDate() - now.getDay(); 
+            startTime = new Date(now.getFullYear(), now.getMonth(), firstDay).getTime();
+        } else if (filter === 'month') {
+            startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        }
+
+        const relevantOrders = allOrders.filter(order => {
+            const orderTime = order.createdAt?.seconds ? order.createdAt.seconds * 1000 : Date.now();
+            return orderTime >= startTime;
+        });
+
+        let rev = 0;
+        let pValue = 0;
+        let iSold = 0;
+        
+        relevantOrders.forEach(order => {
+            if (order.status === 'paid') {
+                rev += order.totalAmount;
+                order.items.forEach(i => iSold += i.qty);
+            } else {
+                pValue += order.totalAmount;
+            }
+        });
+
+        const settled = relevantOrders.filter(o => o.status === 'paid').sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
+
+        setStats({ revenue: rev, orderCount: relevantOrders.length, pendingValue: pValue, itemsSold: iSold });
+        setFilteredOrders(settled);
+
+    }, [filter, allOrders]);
+
+    return (
+        <div className="max-w-4xl mx-auto p-4 pb-24">
+            <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition"><ArrowLeft size={20}/></button>
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><TrendingUp className="text-purple-600"/> Analytics Dashboard</h2>
+                    <p className="text-sm text-gray-500">Track revenue and order history</p>
+                </div>
+            </div>
+
+            <div className="flex bg-gray-200 p-1 rounded-lg mb-6">
+                {['today', 'week', 'month'].map(f => (
+                    <button 
+                        key={f} 
+                        onClick={() => setFilter(f)} 
+                        className={`flex-1 py-2 text-sm font-bold rounded-md capitalize transition ${filter === f ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
+                    >
+                        {f}
+                    </button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
+                    <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
+                    <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
+                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
+                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
+                    <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
+                    <h3 className="text-2xl font-extrabold text-orange-800">₹{stats.pendingValue}</h3>
+                    <p className="text-[10px] text-orange-600 mt-1">From un-settled tables</p>
+                </div>
+            </div>
+
+            <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Settled Bills History ({filteredOrders.length})</h3>
+            
+            {filteredOrders.length === 0 ? (
+                <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
+                    No settled bills found for this time period.
+                </div>
+            ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-600 text-sm">
+                                    <th className="p-3 border-b">Time</th>
+                                    <th className="p-3 border-b">Order ID</th>
+                                    <th className="p-3 border-b">Table</th>
+                                    <th className="p-3 border-b">Items</th>
+                                    <th className="p-3 border-b text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredOrders.map(order => (
+                                    <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                        <td className="p-3 text-sm text-gray-600">
+                                            {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
+                                        </td>
+                                        <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
+                                        <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
+                                        <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
+                                            {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                                        </td>
+                                        <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSettings }) => {
     const [manualTable, setManualTable] = useState('');
@@ -166,7 +448,6 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSetting
             </div>
 
             <div className="grid gap-4 max-w-md mx-auto">
-                {/* NEW REPORTS BUTTON */}
                 <button onClick={() => setView('reports')} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-600 flex items-center justify-between hover:bg-purple-50">
                     <div className="text-left"><h3 className="font-bold text-xl text-gray-800">Analytics & Reports</h3><p className="text-sm text-gray-500">Revenue & Order History</p></div>
                     <TrendingUp className="text-purple-600" size={32} />
@@ -194,140 +475,6 @@ const StaffDashboard = ({ setView, setCurrentTable, storeSettings, updateSetting
                     <Package /> New Parcel / Takeaway
                 </button>
             </div>
-        </div>
-    );
-};
-
-// --- REPORTS DASHBOARD ---
-const ReportView = ({ allOrders, setView }) => {
-    const [filter, setFilter] = useState('today'); // today, week, month
-    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, pendingValue: 0, itemsSold: 0 });
-    const [filteredOrders, setFilteredOrders] = useState([]);
-
-    useEffect(() => {
-        const now = new Date();
-        let startTime = 0;
-
-        if (filter === 'today') {
-            startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        } else if (filter === 'week') {
-            const firstDay = now.getDate() - now.getDay(); 
-            startTime = new Date(now.getFullYear(), now.getMonth(), firstDay).getTime();
-        } else if (filter === 'month') {
-            startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        }
-
-        // Filter orders based on timestamp
-        const relevantOrders = allOrders.filter(order => {
-            const orderTime = order.createdAt?.seconds ? order.createdAt.seconds * 1000 : Date.now();
-            return orderTime >= startTime;
-        });
-
-        // Calculate Stats
-        let rev = 0;
-        let pValue = 0;
-        let iSold = 0;
-        
-        relevantOrders.forEach(order => {
-            if (order.status === 'paid') {
-                rev += order.totalAmount;
-                order.items.forEach(i => iSold += i.qty);
-            } else {
-                pValue += order.totalAmount;
-            }
-        });
-
-        // Sort for table display (newest first), but only show settled bills
-        const settled = relevantOrders.filter(o => o.status === 'paid').sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
-
-        setStats({ revenue: rev, orderCount: relevantOrders.length, pendingValue: pValue, itemsSold: iSold });
-        setFilteredOrders(settled);
-
-    }, [filter, allOrders]);
-
-    return (
-        <div className="max-w-4xl mx-auto p-4 pb-24">
-            <div className="flex items-center gap-4 mb-6">
-                <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition"><ArrowLeft size={20}/></button>
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><TrendingUp className="text-purple-600"/> Analytics Dashboard</h2>
-                    <p className="text-sm text-gray-500">Track revenue and order history</p>
-                </div>
-            </div>
-
-            {/* FILTERS */}
-            <div className="flex bg-gray-200 p-1 rounded-lg mb-6">
-                {['today', 'week', 'month'].map(f => (
-                    <button 
-                        key={f} 
-                        onClick={() => setFilter(f)} 
-                        className={`flex-1 py-2 text-sm font-bold rounded-md capitalize transition ${filter === f ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
-                    >
-                        {f}
-                    </button>
-                ))}
-            </div>
-
-            {/* KEY METRICS */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
-                    <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
-                    <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
-                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
-                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
-                    <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
-                    <h3 className="text-2xl font-extrabold text-orange-800">₹{stats.pendingValue}</h3>
-                    <p className="text-[10px] text-orange-600 mt-1">From un-settled tables</p>
-                </div>
-            </div>
-
-            {/* ORDER HISTORY TABLE */}
-            <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Settled Bills History ({filteredOrders.length})</h3>
-            
-            {filteredOrders.length === 0 ? (
-                <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
-                    No settled bills found for this time period.
-                </div>
-            ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-100 text-gray-600 text-sm">
-                                    <th className="p-3 border-b">Time</th>
-                                    <th className="p-3 border-b">Order ID</th>
-                                    <th className="p-3 border-b">Table</th>
-                                    <th className="p-3 border-b">Items</th>
-                                    <th className="p-3 border-b text-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredOrders.map(order => (
-                                    <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
-                                        <td className="p-3 text-sm text-gray-600">
-                                            {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
-                                        </td>
-                                        <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
-                                        <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
-                                        <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
-                                            {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-                                        </td>
-                                        <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
@@ -390,7 +537,6 @@ const ManageMenuView = ({ setView, storeSettings, toggleStock }) => {
 const BillView = ({ activeOrders, settleTable }) => {
     const tables = {};
     
-    // Group active orders by table
     activeOrders.forEach(order => {
         const table = order.tableNo;
         if (!tables[table]) tables[table] = { tableNo: table, totalAmount: 0, orders: [] };
@@ -474,128 +620,11 @@ const BillView = ({ activeOrders, settleTable }) => {
     );
 };
 
-const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteItemFromOrder, editTableNumber }) => {
-  const [editMode, setEditMode] = useState(false);
-  const kitchenOrders = activeOrders.filter(o => o.status === 'pending');
-
-  return (
-    <div className="max-w-6xl mx-auto p-4 pb-24">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center gap-2">
-            <Store className="text-teal-600" size={28} /> 
-            <h2 className="text-2xl font-bold text-gray-800">Kitchen Display</h2>
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto">
-            <button 
-                onClick={() => setEditMode(!editMode)}
-                className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 ${editMode ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-                {editMode ? <><X size={16}/> DONE EDITING</> : <><Edit size={16}/> EDIT / CANCEL</>}
-            </button>
-            <span className="bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-bold shadow-sm flex items-center">
-                Count: {kitchenOrders.length}
-            </span>
-        </div>
-      </div>
-
-      {kitchenOrders.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-gray-300 shadow-sm">
-          <ChefHat className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-          <p className="text-gray-500 text-lg">Kitchen is clear!</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {kitchenOrders.map((order) => (
-            <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 overflow-hidden relative ${order.tableNo.toString().startsWith('PARCEL') ? 'border-yellow-400' : 'border-teal-500'}`}>
-              
-              <div className="bg-gray-50 p-4 border-b">
-                <div className="flex justify-between items-center mb-2">
-                  {/* EDIT TABLE BUTTON IMPLEMENTED HERE */}
-                  <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                    {order.tableNo.toString().startsWith('PARCEL') ? '📦 Takeaway' : `Table ${order.tableNo}`}
-                    <button 
-                        onClick={() => editTableNumber(order.id, order.tableNo)} 
-                        className="text-gray-400 hover:text-blue-600 p-1 bg-white rounded shadow-sm border border-gray-200"
-                        title="Edit Table Number"
-                    >
-                        <Edit size={14} />
-                    </button>
-                  </h3>
-                  <span className="text-xs text-gray-500 font-mono">
-                    #{order.id.slice(-4)}
-                  </span>
-                </div>
-                {order.note && (
-                    <div className="bg-red-50 text-red-700 p-2 rounded text-sm font-bold border border-red-200">
-                        NOTE: {order.note}
-                    </div>
-                )}
-              </div>
-              
-              <div className="p-4 max-h-64 overflow-y-auto">
-                <ul className="space-y-3">
-                  {order.items.map((item, idx) => (
-                    <li key={idx} className="flex justify-between items-center border-b border-dashed border-gray-100 pb-2 last:border-0 last:pb-0">
-                      <div className="flex gap-3 items-center">
-                        {editMode && (
-                            <button 
-                                onClick={() => deleteItemFromOrder(order, idx)} 
-                                className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition"
-                            >
-                                <Trash2 size={20} />
-                            </button>
-                        )}
-                        <span className="font-bold text-gray-800 bg-gray-100 h-8 w-8 flex items-center justify-center rounded-lg text-sm border border-gray-200 shadow-sm">
-                          {item.qty}
-                        </span>
-                        <div>
-                          <p className={`font-medium ${item.isVeg !== false ? 'text-green-700' : 'text-red-700'}`}>
-                            {item.name}
-                          </p>
-                          {item.variant && <p className="text-[10px] text-gray-500">({item.variant})</p>}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="p-4 bg-gray-50 border-t">
-                {editMode ? (
-                    <button 
-                        onClick={() => deleteOrder(order.id)}
-                        className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition flex justify-center items-center gap-2 shadow-md"
-                    >
-                        <Trash2 size={20} /> CANCEL ENTIRE TICKET
-                    </button>
-                ) : (
-                    <button 
-                        onClick={() => updateOrderStatus(order.id, 'served')}
-                        className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-md active:scale-95"
-                    >
-                        <Utensils size={18} /> Mark Served
-                    </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavailableVariants }) => {
   const [selectedVariant, setSelectedVariant] = useState(item.variants ? item.variants[0] : null);
 
-  const getCurrentId = () => {
-      if (selectedVariant) return `${item.id}-${selectedVariant.name}`;
-      return item.id.toString();
-  }
-
-  const currentId = getCurrentId();
-  const cartItem = cart.find(cartItem => cartItem.id === currentId);
+  const currentId = selectedVariant ? `${item.id}-${selectedVariant.name}` : item.id.toString();
+  const cartItem = cart.find(c => c.id === currentId);
   const qty = cartItem ? cartItem.qty : 0;
 
   const isVariantUnavailable = selectedVariant && unavailableVariants?.includes(currentId);
@@ -603,39 +632,21 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
 
   const handleAdd = () => {
     if(isTrulyUnavailable) return;
-    
-    let itemToAdd = item;
-    if (selectedVariant) {
-        itemToAdd = {
-            ...item,
-            id: currentId,
-            name: `${item.name} (${selectedVariant.name})`,
-            price: selectedVariant.price,
-            variant: selectedVariant.name
-        };
-    }
-    if (!item.variants) {
-        itemToAdd = { ...item, id: item.id.toString() };
-    }
-
+    let itemToAdd = selectedVariant ? { ...item, id: currentId, name: `${item.name} (${selectedVariant.name})`, price: selectedVariant.price, variant: selectedVariant.name } : { ...item, id: item.id.toString() };
     addToCart(itemToAdd);
   };
-
-  const handleIncrement = () => updateQuantity(currentId, 1);
-  const handleDecrement = () => updateQuantity(currentId, -1);
 
   const currentDescription = selectedVariant ? selectedVariant.desc : item.description;
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${isTrulyUnavailable ? 'opacity-75' : ''}`}>
+    <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden relative ${isTrulyUnavailable ? 'opacity-75' : ''}`}>
         {isTrulyUnavailable && (
             <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center pointer-events-none">
                 <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold rounded shadow-lg transform -rotate-12">OUT OF STOCK</span>
             </div>
         )}
-
         <div className="w-28 h-auto md:w-32 md:h-auto relative flex-shrink-0 bg-gray-100">
-            <img src={item.image} alt={item.name} className="w-full h-full object-cover" onError={(e) => {e.target.src = 'https://placehold.co/100x100?text=PC'}} />
+            <img loading="lazy" src={item.image} alt={item.name} className="w-full h-full object-cover" onError={(e) => {e.target.src = 'https://placehold.co/100x100?text=PC'}} />
         </div>
         <div className="p-3 flex flex-col flex-grow justify-between">
             <div>
@@ -653,11 +664,7 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
                             const vId = `${item.id}-${v.name}`;
                             const vUnavailable = unavailableVariants?.includes(vId);
                             return (
-                                <button 
-                                    key={v.name}
-                                    onClick={() => setSelectedVariant(v)}
-                                    className={`text-[10px] px-2 py-1 rounded border transition ${selectedVariant.name === v.name ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300'} ${vUnavailable ? 'opacity-50 decoration-slate-500 line-through' : ''}`}
-                                >
+                                <button key={v.name} onClick={() => setSelectedVariant(v)} className={`text-[10px] px-2 py-1 rounded border transition ${selectedVariant.name === v.name ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-300'} ${vUnavailable ? 'opacity-50 line-through' : ''}`}>
                                     {v.name}
                                 </button>
                             )
@@ -667,7 +674,6 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
                     <p className="text-gray-500 text-xs mt-1 font-bold">₹{item.price}</p>
                 )}
             </div>
-            
             <div className="flex justify-between items-end mt-2">
                 <span className="font-bold text-teal-800">₹{selectedVariant ? selectedVariant.price : item.price}</span>
                 {qty === 0 ? (
@@ -676,48 +682,42 @@ const MenuCard = ({ item, cart, addToCart, updateQuantity, unavailable, unavaila
                     </button>
                 ) : (
                     <div className="flex items-center bg-teal-600 rounded-lg text-white font-bold text-xs shadow-md">
-                        <button onClick={handleDecrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-l-lg transition active:bg-teal-800"><Minus size={12} /></button>
+                        <button onClick={() => updateQuantity(currentId, -1)} className="px-3 py-1.5 hover:bg-teal-700 rounded-l-lg"><Minus size={12} /></button>
                         <span className="px-1">{qty}</span>
-                        <button onClick={handleIncrement} className="px-3 py-1.5 hover:bg-teal-700 rounded-r-lg transition active:bg-teal-800"><Plus size={12} /></button>
+                        <button onClick={() => updateQuantity(currentId, 1)} className="px-3 py-1.5 hover:bg-teal-700 rounded-r-lg"><Plus size={12} /></button>
                     </div>
                 )}
             </div>
         </div>
-    </div>
+    </motion.div>
   );
 };
 
 // --- MAIN APP COMPONENT ---
-
 const App = () => {
   const [view, setView] = useState('loading'); 
   const [cart, setCart] = useState([]);
-  
-  // Now stores ALL orders to calculate reports, activeOrders is derived below
   const [allOrders, setAllOrders] = useState([]); 
-  
   const [currentTable, setCurrentTable] = useState(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [kitchenPassword, setKitchenPassword] = useState('');
   const [isStaff, setIsStaff] = useState(false);
   const [orderNote, setOrderNote] = useState('');
   const [storeSettings, setStoreSettings] = useState({ rushMode: false, isOpen: true, unavailable: [] });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const audioRef = useRef(null);
   const prevPendingCount = useRef(0);
-
-  // Derive active orders from all orders (filters out 'paid')
   const activeOrders = allOrders.filter(o => o.status !== 'paid');
 
   const changeView = (newView) => {
       window.history.pushState({ view: newView }, '');
       setView(newView);
+      window.scrollTo(0, 0);
   };
 
   useEffect(() => {
-      const handlePopState = (event) => {
-          if (event.state && event.state.view) setView(event.state.view);
-      };
+      const handlePopState = (event) => { if (event.state && event.state.view) setView(event.state.view); };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -726,17 +726,10 @@ const App = () => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
     if (tableParam) {
-        if(tableParam === 'PARCEL') {
-             const uniqueId = `PARCEL-${Math.floor(1000 + Math.random() * 9000)}`;
-             setCurrentTable(uniqueId);
-        } else {
-             setCurrentTable(tableParam);
-        }
-        setIsStaff(false);
+        setCurrentTable(tableParam === 'PARCEL' ? `PARCEL-${Math.floor(1000 + Math.random() * 9000)}` : tableParam);
         setView('menu');
         window.history.replaceState({ view: 'menu' }, '');
     } else {
-        setIsStaff(false);
         setView('login');
         window.history.replaceState({ view: 'login' }, '');
     }
@@ -751,18 +744,11 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // Listen to ALL orders, sorted newest first
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllOrders(orders);
-
-      const liveOrders = orders.filter(o => o.status !== 'paid');
-      const pendingCount = liveOrders.filter(o => o.status === 'pending').length;
+      const pendingCount = orders.filter(o => o.status === 'pending').length;
       if (pendingCount > prevPendingCount.current) {
           if(audioRef.current) audioRef.current.play().catch(e => console.log("Audio play failed:", e));
       }
@@ -770,6 +756,26 @@ const App = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleLogin = async () => {
+      try {
+          const docRef = doc(db, "admin_auth", kitchenPassword);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+              setIsStaff(true);
+              changeView('staff-dashboard');
+              setKitchenPassword('');
+          } else {
+              alert("Access Denied: Incorrect PIN");
+          }
+      } catch (error) {
+          console.error(error);
+          alert("Database connection error or PIN is missing in backend.");
+      }
+  };
+
+  const handleLogout = () => { setIsStaff(false); changeView('login'); setCurrentTable(null); };
 
   const addToCart = (item) => {
     setCart(prev => {
@@ -825,10 +831,8 @@ const App = () => {
       }
   };
 
-  // NEW FEATURE: Edit Table Number
   const editTableNumber = async (orderId, currentTableVal) => {
       const newTable = window.prompt("Change table number to:", currentTableVal);
-      // Ensure they didn't hit cancel, and they actually typed a new number
       if (newTable && newTable.trim() !== "" && newTable.trim() !== currentTableVal) {
           try {
               await updateDoc(doc(db, "orders", orderId), { tableNo: newTable.trim() });
@@ -897,45 +901,18 @@ const App = () => {
       await updateDoc(doc(db, "settings", "store"), { unavailable: list });
   };
 
-  const handleLogin = () => {
-      if(kitchenPassword === '1234') { 
-          setIsStaff(true);
-          changeView('staff-dashboard');
-          setKitchenPassword('');
-      } else {
-          alert("Wrong Password!");
-      }
-  };
 
-  const handleLogout = () => {
-      setIsStaff(false);
-      changeView('login');
-      setCurrentTable(null);
-  };
-
-  // --- VIEWS ROUTING ---
-  if (view === 'loading') return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold">Loading PC's Kitchen...</div>;
-
+  if (view === 'loading') return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold">Loading...</div>;
+  
   if (view === 'login') return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
           <audio ref={audioRef} src="/bell.wav" preload="auto" />
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
-              <div className="flex justify-center mb-4">
-                  <div className="bg-teal-100 p-3 rounded-full">
-                      <Lock className="text-teal-700" size={24} />
-                  </div>
-              </div>
+              <div className="flex justify-center mb-4"><div className="bg-teal-100 p-3 rounded-full"><Lock className="text-teal-700" size={24} /></div></div>
               <h2 className="text-2xl font-bold text-center mb-1 text-gray-800">Staff Login</h2>
-              <input 
-                type="password" 
-                placeholder="PIN" 
-                className="w-full border-2 border-gray-200 p-3 rounded-lg text-center text-2xl tracking-widest mb-6 focus:border-teal-500 focus:outline-none"
-                value={kitchenPassword}
-                onChange={(e) => setKitchenPassword(e.target.value)}
-              />
-              <button onClick={handleLogin} className="w-full bg-teal-800 text-white py-3 rounded-lg font-bold hover:bg-teal-900 transition shadow-lg">
-                  Access Dashboard
-              </button>
+              <p className="text-center text-xs text-gray-500 mb-6">Secured by Firebase Auth</p>
+              <input type="password" placeholder="PIN" className="w-full border-2 border-gray-200 p-3 rounded-lg text-center text-2xl tracking-widest mb-6 focus:border-teal-500 focus:outline-none" value={kitchenPassword} onChange={(e) => setKitchenPassword(e.target.value)} />
+              <button onClick={handleLogin} className="w-full bg-teal-800 text-white py-3 rounded-lg font-bold hover:bg-teal-900 transition shadow-lg">Access Dashboard</button>
           </div>
       </div>
   );
@@ -989,21 +966,48 @@ const App = () => {
       </div>
   );
 
-  if (view === 'menu') return (
+  if (view === 'menu') {
+    const scrollToCategory = (cat) => {
+        const element = document.getElementById(`category-${cat}`);
+        if(element) {
+            const headerOffset = 140; 
+            const elementPosition = element.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+        }
+    };
+
+    return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
       <Header view={view} setView={changeView} cartCount={cart.reduce((a, b) => a + b.qty, 0)} currentTable={currentTable} isStaff={isStaff} logout={handleLogout} storeSettings={storeSettings} />
-      <main className="pt-4 max-w-4xl mx-auto px-4 pb-20">
-        {isStaff && (
-            <div className="bg-orange-100 border-l-4 border-orange-500 p-3 mb-4 rounded shadow-sm flex justify-between items-center">
-                <div>
-                    <p className="font-bold text-orange-800 text-sm">Waiter Mode Active</p>
-                    <p className="text-xs text-orange-700">Taking order for {currentTable}</p>
-                </div>
-                <button onClick={() => changeView('staff-dashboard')} className="text-xs bg-white px-3 py-1 rounded border border-orange-200">Cancel</button>
-            </div>
-        )}
-        
-        {["Lunch Specials (Thali)", "Starters", "Egg Specials", "Main Course", "Breads & Rice", "Beverages"].map(cat => {
+      
+      <div className="sticky top-[72px] z-40 bg-gray-100 border-b border-gray-200 pb-2 shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 pt-3">
+              <div className="relative mb-3">
+                  <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                  <input 
+                      type="text" 
+                      placeholder="Search for Jeera Rice, Chicken..." 
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 focus:outline-none focus:border-teal-500 shadow-inner text-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+              </div>
+              
+              {!searchQuery && (
+                  <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-2 -mx-4 px-4 snap-x">
+                      {CATEGORIES.map(cat => (
+                          <button key={cat} onClick={() => scrollToCategory(cat)} className="whitespace-nowrap bg-white px-4 py-1.5 rounded-full text-sm font-bold text-gray-600 border border-gray-200 shadow-sm snap-start hover:bg-teal-50 hover:text-teal-700 transition">
+                              {cat}
+                          </button>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </div>
+
+      <main className="pt-4 max-w-4xl mx-auto px-4 pb-24">
+        {CATEGORIES.map(cat => {
             if (cat === "Lunch Specials (Thali)") {
                 const now = new Date();
                 const minutes = now.getHours() * 60 + now.getMinutes();
@@ -1011,50 +1015,40 @@ const App = () => {
                 if (!isLunchTime && !isStaff) return null;
             }
 
-            const items = MENU_ITEMS.filter(item => item.category === cat);
+            const items = MENU_ITEMS.filter(item => 
+                item.category === cat && 
+                item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
             if (items.length === 0) return null;
 
             return (
-                <div key={cat} className="mb-8">
-                <h2 className="text-xl font-extrabold mb-4 text-gray-800 flex items-center">
-                    <span className="w-2 h-8 bg-teal-600 rounded-r-lg mr-3"></span>
-                    {cat}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {items.map(item => {
-                        const isMainUnavailable = storeSettings.unavailable?.includes(item.id.toString());
-                        return (
-                            <MenuCard 
-                                key={item.id} 
-                                item={item} 
-                                cart={cart}
-                                addToCart={addToCart}
-                                updateQuantity={updateQuantity}
-                                unavailable={isMainUnavailable}
-                                unavailableVariants={storeSettings.unavailable || []}
-                            />
-                        );
-                    })}
-                </div>
+                <div key={cat} id={`category-${cat}`} className="mb-8 scroll-mt-36">
+                    <h2 className="text-xl font-extrabold mb-4 text-gray-800 flex items-center">
+                        <span className="w-2 h-8 bg-teal-600 rounded-r-lg mr-3"></span>{cat}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {items.map(item => (
+                            <MenuCard key={item.id} item={item} cart={cart} addToCart={addToCart} updateQuantity={updateQuantity} unavailable={storeSettings.unavailable?.includes(item.id.toString())} unavailableVariants={storeSettings.unavailable || []} />
+                        ))}
+                    </div>
                 </div>
             );
         })}
         
+        <AnimatePresence>
         {cart.length > 0 && (
-            <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
-                <button 
-                    onClick={() => changeView('cart')}
-                    className="bg-teal-800 text-white px-8 py-3 rounded-full shadow-2xl font-bold flex items-center gap-3 animate-bounce hover:bg-teal-900 transition border-2 border-white"
-                >
+            <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-40">
+                <button onClick={() => changeView('cart')} className="bg-teal-800 text-white px-8 py-3 rounded-full shadow-2xl font-bold flex items-center gap-3 hover:bg-teal-900 transition border-2 border-white">
                     <span>{cart.reduce((a, b) => a + b.qty, 0)} Items</span>
                     <span className="w-1 h-4 bg-teal-600/50 rounded-full"></span>
                     <span>View Cart</span>
                 </button>
-            </div>
+            </motion.div>
         )}
+        </AnimatePresence>
       </main>
     </div>
-  );
+  )};
 
   if (view === 'cart') {
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
