@@ -45,11 +45,11 @@ const MENU_ITEMS = [
   // --- MAIN COURSE ---
   { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }] },
   { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 180, variants: [{ name: "Half", price: 180, desc: "2 thigh, thick gravy" }, { name: "Full", price: 270, desc: "1 leg, 2 thigh, thick gravy" }] },
-  { id: 305, category: "Main Course", name: "Butter Chicken", price: 270, isVeg: false, image: "/dishes/butter-chicken.avif", description: "6 pc boneless, gravy" },
+  { id: 305, category: "Main Course", name: "Butter Chicken", price: 300, isVeg: false, image: "/dishes/butter-chicken.avif", description: "6 pc boneless, gravy" },
   { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", description: "2 pc, gravy" },
   { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", description: "12 pc, gravy" },
-  { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 220, variants: [{ name: "Half", price: 220 }, { name: "Full", price: 350 }] },
-  { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 260, variants: [{ name: "Half", price: 260, desc: "3 pc, gravy" }, { name: "Full", price: 410, desc: "6 pc, gravy" }] },
+  { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 280, variants: [{ name: "Half", price: 280 }, { name: "Full", price: 400 }] },
+  { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 300, variants: [{ name: "Half", price: 300, desc: "3 pc, gravy" }, { name: "Full", price: 450, desc: "6 pc, gravy" }] },
 
   // --- BREADS & RICE ---
   { id: 401, category: "Breads & Rice", name: "Roti (Plain)", price: 15, isVeg: true, image: "/dishes/roti.avif" },
