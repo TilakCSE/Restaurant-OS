@@ -13,7 +13,7 @@
 **How to test**
 - Customer (Table 1): `https://restaurant-os-eosin.vercel.app/?table=1`  
 - Parcel/Takeaway: `https://restaurant-os-eosin.vercel.app/?table=PARCEL`  
-- Kitchen/Staff: Open the main link and enter **PIN: `1234`**
+
 
 ---
 
