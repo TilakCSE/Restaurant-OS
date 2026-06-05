@@ -811,10 +811,11 @@ useEffect(() => {
         status: 'pending',
         note: orderNote, 
         createdAt: serverTimestamp(),
+        secretToken: 'PC_KITCHEN_SECURE_99' // <--- ADD THIS EXACT LINE
       });
       setCart([]);
       setOrderNote('');
-      changeView('success');
+      changeView('success'); 
       
       if(isStaff) {
           setTimeout(() => {
