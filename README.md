@@ -18,16 +18,27 @@
 ---
 
 ## 📋 Table of Contents
-1. [Key Features](#-key-features)
-2. [Screenshots](#-screenshots)
-3. [Tech Stack](#-tech-stack)
-4. [Local Development](#-local-development)
-5. [Environment Variables](#-environment-variables)
-6. [Firestore Security Rules (example)](#-firestore-security-rules-example)
-7. [Deployment](#-deployment)
-8. [Roadmap](#-roadmap)
-9. [Contributing](#-contributing)
-10. [License & Credits](#-license--credits)
+- [🍽️ Restaurant OS — PC's Kitchen](#️-restaurant-os--pcs-kitchen)
+  - [🔗 Live Demo](#-live-demo)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [✨ Key Features](#-key-features)
+    - [Customer Interface (Self-Ordering)](#customer-interface-self-ordering)
+    - [Kitchen Display System (KDS)](#kitchen-display-system-kds)
+    - [Staff Dashboard](#staff-dashboard)
+  - [🛠️ Tech Stack](#️-tech-stack)
+  - [⚙️ Local Development](#️-local-development)
+    - [1. Clone](#1-clone)
+    - [2. Install](#2-install)
+    - [3. Setup environment](#3-setup-environment)
+    - [4. Run local dev server](#4-run-local-dev-server)
+  - [🔐 Firestore Security Rules (example)](#-firestore-security-rules-example)
+  - [📦 Deployment](#-deployment)
+  - [🔮 Roadmap](#-roadmap)
+  - [🤝 Contributing](#-contributing)
+  - [🧪 Testing Notes / QA Checklist](#-testing-notes--qa-checklist)
+  - [📄 License \& Credits](#-license--credits)
+  - [📬 Contact](#-contact)
+  - [📌 Example `package.json` scripts (suggested)](#-example-packagejson-scripts-suggested)
 
 ---
 

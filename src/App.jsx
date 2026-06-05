@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
 import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, DollarSign, BarChart3, Search, Moon, Sun, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -736,15 +736,21 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-      const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
-          if (doc.exists()) setStoreSettings(doc.data());
-          else setDoc(doc.ref, { rushMode: false, isOpen: true, unavailable: [] });
-      });
-      return () => unsub();
-  }, []);
+    const unsub = onSnapshot(doc(db, "settings", "store"), (doc) => {
+        if (doc.exists()) setStoreSettings(doc.data());
+        else setDoc(doc.ref, { rushMode: false, isOpen: true, unavailable: [] });
+    });
+    return () => unsub();
+}, []);
 
-  useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+useEffect(() => {
+    // We added the 'where' clause here to only download active tickets!
+    const q = query(
+        collection(db, "orders"), 
+        where("status", "in", ["pending", "served"]), 
+        orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllOrders(orders);
