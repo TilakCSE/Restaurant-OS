@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc, where, increment, limit, getDocs } from 'firebase/firestore';
 import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, DollarSign, BarChart3, Search, Moon, Sun, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -273,48 +273,67 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
   );
 };
 
-const ReportView = ({ allOrders, setView }) => {
+const ReportView = ({ activeOrders, setView }) => {
     const [filter, setFilter] = useState('today'); 
-    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, pendingValue: 0, itemsSold: 0 });
+    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, itemsSold: 0 });
     const [filteredOrders, setFilteredOrders] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Calculate pending value from the active orders already loaded in the kitchen
+    const pendingValue = activeOrders?.reduce((sum, order) => sum + order.totalAmount, 0) || 0;
 
     useEffect(() => {
-        const now = new Date();
-        let startTime = 0;
+        const fetchAnalytics = async () => {
+            setIsLoading(true);
+            let rev = 0; let count = 0; let sold = 0;
+            const datesToFetch = [];
+            const now = new Date();
+            
+            const getLocalDateStr = (d) => {
+                const offset = d.getTimezoneOffset() * 60000;
+                return (new Date(d.getTime() - offset)).toISOString().split('T')[0];
+            };
 
-        if (filter === 'today') {
-            startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        } else if (filter === 'week') {
-            const firstDay = now.getDate() - now.getDay(); 
-            startTime = new Date(now.getFullYear(), now.getMonth(), firstDay).getTime();
-        } else if (filter === 'month') {
-            startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        }
-
-        const relevantOrders = allOrders.filter(order => {
-            const orderTime = order.createdAt?.seconds ? order.createdAt.seconds * 1000 : Date.now();
-            return orderTime >= startTime;
-        });
-
-        let rev = 0;
-        let pValue = 0;
-        let iSold = 0;
-        
-        relevantOrders.forEach(order => {
-            if (order.status === 'paid') {
-                rev += order.totalAmount;
-                order.items.forEach(i => iSold += i.qty);
-            } else {
-                pValue += order.totalAmount;
+            // Determine how many daily stat documents we need to fetch
+            const days = filter === 'today' ? 1 : (filter === 'week' ? 7 : 30);
+            for(let i=0; i<days; i++) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                datesToFetch.push(getLocalDateStr(d));
             }
-        });
 
-        const settled = relevantOrders.filter(o => o.status === 'paid').sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
+            try {
+                // 1. Fetch exactly 1 to 30 documents for the stats (Ultra optimized reads)
+                await Promise.all(datesToFetch.map(async (dateStr) => {
+                    const snap = await getDoc(doc(db, "daily_stats", dateStr));
+                    if(snap.exists()) {
+                        const data = snap.data();
+                        rev += (data.revenue || 0);
+                        count += (data.orderCount || 0);
+                        sold += (data.itemsSold || 0);
+                    }
+                }));
+                setStats({ revenue: rev, orderCount: count, itemsSold: sold });
 
-        setStats({ revenue: rev, orderCount: relevantOrders.length, pendingValue: pValue, itemsSold: iSold });
-        setFilteredOrders(settled);
+                // 2. Fetch the latest 50 settled bills for the history table
+                // By capping it at limit(50), we guarantee this screen never exceeds 80 reads!
+                const historyQuery = query(
+                    collection(db, "orders"), 
+                    where("status", "==", "paid"), 
+                    orderBy("createdAt", "desc"), 
+                    limit(50)
+                );
+                const historySnap = await getDocs(historyQuery);
+                setFilteredOrders(historySnap.docs.map(d => ({id: d.id, ...d.data()})));
+                
+            } catch (e) {
+                console.error("Error fetching analytics:", e);
+            }
+            setIsLoading(false);
+        };
 
-    }, [filter, allOrders]);
+        fetchAnalytics();
+    }, [filter]);
 
     return (
         <div className="max-w-4xl mx-auto p-4 pb-24">
@@ -338,63 +357,69 @@ const ReportView = ({ allOrders, setView }) => {
                 ))}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
-                    <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
-                    <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
-                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
-                    <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
-                    <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
-                    <h3 className="text-2xl font-extrabold text-orange-800">₹{stats.pendingValue}</h3>
-                    <p className="text-[10px] text-orange-600 mt-1">From un-settled tables</p>
-                </div>
-            </div>
-
-            <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Settled Bills History ({filteredOrders.length})</h3>
-            
-            {filteredOrders.length === 0 ? (
-                <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
-                    No settled bills found for this time period.
-                </div>
+            {isLoading ? (
+                <div className="text-center py-10 font-bold text-gray-500 animate-pulse">Calculating Secure Revenue...</div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-100 text-gray-600 text-sm">
-                                    <th className="p-3 border-b">Time</th>
-                                    <th className="p-3 border-b">Order ID</th>
-                                    <th className="p-3 border-b">Table</th>
-                                    <th className="p-3 border-b">Items</th>
-                                    <th className="p-3 border-b text-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredOrders.map(order => (
-                                    <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
-                                        <td className="p-3 text-sm text-gray-600">
-                                            {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
-                                        </td>
-                                        <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
-                                        <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
-                                        <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
-                                            {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-                                        </td>
-                                        <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
+                            <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
+                            <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
+                            <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
+                            <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
+                        </div>
+                        <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
+                            <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
+                            <h3 className="text-2xl font-extrabold text-orange-800">₹{pendingValue}</h3>
+                            <p className="text-[10px] text-orange-600 mt-1">From active tables</p>
+                        </div>
                     </div>
-                </div>
+
+                    <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Latest Settled Bills</h3>
+                    
+                    {filteredOrders.length === 0 ? (
+                        <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
+                            No settled bills found.
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-100 text-gray-600 text-sm">
+                                            <th className="p-3 border-b">Time</th>
+                                            <th className="p-3 border-b">Order ID</th>
+                                            <th className="p-3 border-b">Table</th>
+                                            <th className="p-3 border-b">Items</th>
+                                            <th className="p-3 border-b text-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredOrders.map(order => (
+                                            <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                                <td className="p-3 text-sm text-gray-600">
+                                                    {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
+                                                </td>
+                                                <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
+                                                <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
+                                                <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
+                                                    {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                                                </td>
+                                                <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
@@ -851,18 +876,34 @@ useEffect(() => {
   };
 
   const settleTable = async (tableOrders) => {
-      const total = tableOrders.reduce((acc, order) => acc + order.totalAmount, 0);
-      if(!window.confirm(`Settle bill? Total: ₹${total}`)) return;
+    const total = tableOrders.reduce((acc, order) => acc + order.totalAmount, 0);
+    if(!window.confirm(`Settle bill? Total: ₹${total}`)) return;
 
-      try {
-          await Promise.all(tableOrders.map(order => 
-              updateDoc(doc(db, "orders", order.id), { status: 'paid' })
-          ));
-      } catch(error) {
-          console.error("Error settling table:", error);
-          alert("Failed to settle table.");
-      }
-  };
+    // Get today's date in local YYYY-MM-DD format for the stats document
+    const today = new Date();
+    const offset = today.getTimezoneOffset() * 60000;
+    const dateStr = (new Date(today.getTime() - offset)).toISOString().split('T')[0];
+    const statsRef = doc(db, "daily_stats", dateStr);
+
+    try {
+        // 1. Mark orders as paid
+        await Promise.all(tableOrders.map(order => 
+            updateDoc(doc(db, "orders", order.id), { status: 'paid' })
+        ));
+
+        // 2. Safely increment the Daily Stats (Costs only 1 Write!)
+        const itemsSold = tableOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0);
+        await setDoc(statsRef, {
+            revenue: increment(total),
+            orderCount: increment(tableOrders.length),
+            itemsSold: increment(itemsSold)
+        }, { merge: true });
+
+    } catch(error) {
+        console.error("Error settling table:", error);
+        alert("Failed to settle table.");
+    }
+};
 
   const deleteOrder = async (orderId) => {
       if(!window.confirm("CANCEL THIS ENTIRE TICKET?")) return;
@@ -935,7 +976,7 @@ useEffect(() => {
   if (view === 'reports') return (
       <>
         <Header view={view} setView={changeView} cartCount={0} currentTable={null} isStaff={true} logout={handleLogout} storeSettings={storeSettings} />
-        <ReportView allOrders={allOrders} setView={changeView} />
+        <ReportView activeOrders={activeOrders} setView={changeView} />
       </>
   );
 
