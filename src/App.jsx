@@ -814,7 +814,11 @@ useEffect(() => {
   const handleCustomerSubmit = async (e) => {
     e.preventDefault();
     if (!customerInfo.name.trim() || !customerInfo.phone.trim()) return alert("Please enter valid details");
-    if (customerInfo.phone.trim().length < 10) return alert("Please enter a valid 10-digit phone number");
+
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(customerInfo.phone.trim())) {
+        return alert("Please enter a valid 10-digit phone number");
+    }
 
     setIsSubmittingCustomer(true);
     try {
@@ -1252,7 +1256,7 @@ useEffect(() => {
                   <div>
                       <label className="text-xs font-bold text-gray-600 block mb-1 uppercase tracking-wider">Your Name</label>
                       <input 
-                          type="text" required placeholder="E.g., Tilak Chauhan" 
+                          type="text" required placeholder=""
                           className="w-full border border-gray-300 p-3 rounded-xl focus:border-teal-600 focus:outline-none text-base"
                           value={customerInfo.name} onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
                       />
