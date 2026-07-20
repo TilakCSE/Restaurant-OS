@@ -814,28 +814,42 @@ useEffect(() => {
   const handleCustomerSubmit = async (e) => {
     e.preventDefault();
     if (!customerInfo.name.trim() || !customerInfo.phone.trim()) return alert("Please enter valid details");
-
+    
+    // STRICT 10-DIGIT CHECK
     const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(customerInfo.phone.trim())) {
+    const phoneKey = customerInfo.phone.trim();
+    
+    if (!phoneRegex.test(phoneKey)) {
         return alert("Please enter a valid 10-digit phone number");
     }
 
     setIsSubmittingCustomer(true);
     try {
-      await addDoc(collection(db, "customers"), {
-        name: customerInfo.name.trim(),
-        phone: customerInfo.phone.trim(),
-        addedToWhatsApp: false, // Default state for your brother's checklist
-        createdAt: serverTimestamp()
-      });
+      // Use the phone number as the specific Document ID instead of a random string
+      const customerRef = doc(db, "customers", phoneKey);
+      const docSnap = await getDoc(customerRef);
+
+      if (!docSnap.exists()) {
+        // Only write to the database if this phone number is brand new
+        await setDoc(customerRef, {
+          name: customerInfo.name.trim(),
+          phone: phoneKey,
+          addedToWhatsApp: false, 
+          createdAt: serverTimestamp()
+        });
+      }
       
-      // Save locally so they never see this screen again on this phone
-      localStorage.setItem('pc_kitchen_customer', JSON.stringify(customerInfo));
+      // Save to local device storage and let them into the menu!
+      localStorage.setItem('pc_kitchen_customer', JSON.stringify({ 
+          name: customerInfo.name.trim(), 
+          phone: phoneKey 
+      }));
       changeView('menu');
+      
     } catch (error) {
       console.error("Error saving customer info:", error);
       alert("Something went wrong. Redirecting to menu...");
-      changeView('menu'); // Fail gracefully so they can still order
+      changeView('menu'); 
     }
     setIsSubmittingCustomer(false);
   };
