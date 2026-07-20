@@ -736,6 +736,10 @@ const App = () => {
   const prevPendingCount = useRef(0);
   const activeOrders = allOrders.filter(o => o.status !== 'paid');
 
+  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [customerList, setCustomerList] = useState([]); // For the admin view
+
   const changeView = (newView) => {
       window.history.pushState({ view: newView }, '');
       setView(newView);
@@ -751,10 +755,28 @@ const App = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tableParam = params.get('table');
+    const viewParam = params.get('view');
+
+    // Secret entry point for your brother to manage the WhatsApp group
+    if (viewParam === 'whatsapp-admin') {
+        setIsStaff(true);
+        setView('whatsapp-admin');
+        window.history.replaceState({ view: 'whatsapp-admin' }, '');
+        return;
+    }
+
     if (tableParam) {
         setCurrentTable(tableParam === 'PARCEL' ? `PARCEL-${Math.floor(1000 + Math.random() * 9000)}` : tableParam);
-        setView('menu');
-        window.history.replaceState({ view: 'menu' }, '');
+        
+        // CHECK IF CUSTOMER HAS SIGNED UP BEFORE
+        const savedCustomer = localStorage.getItem('pc_kitchen_customer');
+        if (savedCustomer) {
+            setView('menu');
+            window.history.replaceState({ view: 'menu' }, '');
+        } else {
+            setView('customer-onboarding');
+            window.history.replaceState({ view: 'customer-onboarding' }, '');
+        }
     } else {
         setView('login');
         window.history.replaceState({ view: 'login' }, '');
@@ -788,6 +810,52 @@ useEffect(() => {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleCustomerSubmit = async (e) => {
+    e.preventDefault();
+    if (!customerInfo.name.trim() || !customerInfo.phone.trim()) return alert("Please enter valid details");
+    if (customerInfo.phone.trim().length < 10) return alert("Please enter a valid 10-digit phone number");
+
+    setIsSubmittingCustomer(true);
+    try {
+      await addDoc(collection(db, "customers"), {
+        name: customerInfo.name.trim(),
+        phone: customerInfo.phone.trim(),
+        addedToWhatsApp: false, // Default state for your brother's checklist
+        createdAt: serverTimestamp()
+      });
+      
+      // Save locally so they never see this screen again on this phone
+      localStorage.setItem('pc_kitchen_customer', JSON.stringify(customerInfo));
+      changeView('menu');
+    } catch (error) {
+      console.error("Error saving customer info:", error);
+      alert("Something went wrong. Redirecting to menu...");
+      changeView('menu'); // Fail gracefully so they can still order
+    }
+    setIsSubmittingCustomer(false);
+  };
+
+  // Real-time listener for the secret WhatsApp portal
+  useEffect(() => {
+    if (view === 'whatsapp-admin') {
+      const q = query(collection(db, "customers"), orderBy("createdAt", "desc"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setCustomerList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return () => unsubscribe();
+    }
+  }, [view]);
+
+  const toggleWhatsAppStatus = async (id, currentStatus) => {
+    try {
+      await updateDoc(doc(db, "customers", id), {
+        addedToWhatsApp: !currentStatus
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
+  };
 
   const handleLogin = async () => {
       try {
@@ -1164,6 +1232,112 @@ useEffect(() => {
         </div>
       );
   }
+
+  // --- CUSTOMER ONBOARDING SCREEN ---
+  if (view === 'customer-onboarding') return (
+      <div className="min-h-screen bg-teal-900 flex flex-col items-center justify-center p-4 text-white">
+          <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="bg-white text-gray-900 p-6 rounded-2xl shadow-2xl w-full max-w-sm"
+          >
+              <div className="flex justify-center mb-4 text-teal-700">
+                  <div className="bg-teal-50 p-4 rounded-full">
+                      <UtensilsCrossed size={32} />
+                  </div>
+              </div>
+              <h2 className="text-2xl font-black text-center text-teal-950 font-serif mb-1">Welcome to PC's Kitchen</h2>
+              <p className="text-center text-xs text-gray-500 mb-6">Enter your details to explore the menu & receive special offers on WhatsApp! 🚀</p>
+              
+              <form onSubmit={handleCustomerSubmit} className="space-y-4">
+                  <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1 uppercase tracking-wider">Your Name</label>
+                      <input 
+                          type="text" required placeholder="E.g., Tilak Chauhan" 
+                          className="w-full border border-gray-300 p-3 rounded-xl focus:border-teal-600 focus:outline-none text-base"
+                          value={customerInfo.name} onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                      />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-gray-600 block mb-1 uppercase tracking-wider">WhatsApp Number</label>
+                      <input 
+                          type="tel" required placeholder="10-digit mobile number" pattern="[0-9]{10}"
+                          className="w-full border border-gray-300 p-3 rounded-xl focus:border-teal-600 focus:outline-none text-base font-mono"
+                          value={customerInfo.phone} onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                      />
+                  </div>
+                  
+                  <button 
+                      type="submit" disabled={isSubmittingCustomer}
+                      className="w-full bg-teal-800 text-white py-4 rounded-xl font-bold hover:bg-teal-900 transition shadow-lg flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                  >
+                      {isSubmittingCustomer ? 'Opening Menu...' : 'View Menu ➔'}
+                  </button>
+              </form>
+          </motion.div>
+      </div>
+  );
+
+  // --- SECRET STANDALONE WHATSAPP ADMIN PORTAL ---
+  if (view === 'whatsapp-admin') return (
+      <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900">
+          <div className="max-w-3xl mx-auto">
+              <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                  <div>
+                      <h2 className="text-2xl font-black text-teal-950 flex items-center gap-2"><ClipboardList className="text-teal-600"/> WhatsApp Broadcast Lead List</h2>
+                      <p className="text-xs text-gray-500">Manually add users who scanned the QR code into your community group.</p>
+                  </div>
+                  <div className="bg-teal-800 text-white px-3 py-1 rounded-full font-bold text-sm">
+                      Total Leads: {customerList.length}
+                  </div>
+              </div>
+
+              {customerList.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300 text-gray-400">
+                      No customer leads captured yet.
+                  </div>
+              ) : (
+                  <div className="space-y-3">
+                      {customerList.map((customer) => (
+                          <div 
+                              key={customer.id} 
+                              className={`p-4 rounded-xl border shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${customer.addedToWhatsApp ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}`}
+                          >
+                              <div>
+                                  <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                      {customer.name}
+                                      {customer.addedToWhatsApp && (
+                                          <span className="text-[10px] bg-green-200 text-green-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Added</span>
+                                      )}
+                                  </h4>
+                                  <p className="text-base text-gray-600 font-mono font-medium mt-0.5">{customer.phone}</p>
+                                  <p className="text-[10px] text-gray-400 mt-1">
+                                      Scanned: {customer.createdAt?.seconds ? new Date(customer.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
+                                  </p>
+                              </div>
+
+                              <div className="flex items-center gap-3 self-end sm:self-center">
+                                  {/* Direct click-to-chat WhatsApp link to make manual adding fast */}
+                                  <a 
+                                      href={`https://wa.me/91${customer.phone}`} target="_blank" rel="noopener noreferrer"
+                                      className="px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-xs hover:bg-emerald-700 transition shadow-sm flex items-center gap-1"
+                                  >
+                                      Chat & Add
+                                  </a>
+                                  
+                                  <button 
+                                      onClick={() => toggleWhatsAppStatus(customer.id, customer.addedToWhatsApp)}
+                                      className={`px-4 py-2 rounded-lg font-bold text-xs transition border ${customer.addedToWhatsApp ? 'bg-white border-green-500 text-green-700 hover:bg-green-50' : 'bg-gray-800 border-gray-800 text-white hover:bg-gray-900'}`}
+                                  >
+                                      {customer.addedToWhatsApp ? 'Mark Remaining' : 'Mark Added'}
+                                  </button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </div>
+  );
 
   if (view === 'success') return (
       <div className="flex flex-col items-center justify-center pt-24 px-4 text-center min-h-screen bg-gray-50">
