@@ -27,8 +27,6 @@ const MENU_ITEMS = [
   { id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
   { id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
   { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" },
-  { id: 108, category: "Starters", name: "Mutton Kaleji Fry", isVeg: false, image: "/dishes/mutton-kaleji.avif", price: 150, variants: [{ name: "Half (4pcs)", price: 150 }, { name: "Full (8pcs)", price: 240 }] },
-
   // --- EGG SPECIALS ---
   { id: 201, category: "Egg Specials", name: "Omelette (2 Eggs)", price: 70, isVeg: false, image: "/dishes/omelette.avif" },
   { id: 202, category: "Egg Specials", name: "Chicken Rassa Omelette", price: 100, isVeg: false, image: "/dishes/chicken-rassa-omelette.avif" },
