@@ -26,15 +26,15 @@ const MENU_ITEMS = [
   { id: 102, category: "Starters", name: "Egg Boil Fry (2 eggs)", price: 60, isVeg: false, image: "/dishes/egg-fry.avif" },
   { id: 103, category: "Starters", name: "Chicken Tikka", isVeg: false, image: "/dishes/chicken-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
   { id: 105, category: "Starters", name: "Afghani Chicken Tikka", isVeg: false, image: "/dishes/afghani-tikka.avif", price: 130, variants: [{ name: "Half (6pcs)", price: 130 }, { name: "Full (12pcs)", price: 220 }] },
-  { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 270, isVeg: false, image: "/dishes/prawns.avif" },
+  { id: 107, category: "Starters", name: "Prawns Fry (12 pcs)", price: 280, isVeg: false, image: "/dishes/prawns.avif" },
   // --- EGG SPECIALS ---
   { id: 201, category: "Egg Specials", name: "Omelette (2 Eggs)", price: 70, isVeg: false, image: "/dishes/omelette.avif" },
   { id: 202, category: "Egg Specials", name: "Chicken Rassa Omelette", price: 100, isVeg: false, image: "/dishes/chicken-rassa-omelette.avif" },
   { id: 203, category: "Egg Specials", name: "Mutton Rassa Omelette", price: 120, isVeg: false, image: "/dishes/mutton-rassa-omelette.avif" },
   { id: 204, category: "Egg Specials", name: "Egg Bhurji (2 Eggs)", price: 100, isVeg: false, image: "/dishes/egg-bhurji.avif" },
-  { id: 208, category: "Egg Specials", name: "Boil Bhurji (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-bhurji.avif" },
-  { id: 205, category: "Egg Specials", name: "Egg Pulao", price: 120, isVeg: false, image: "/dishes/egg-pulao.avif" },
-  { id: 206, category: "Egg Specials", name: "Boil Tikka Masala (2 Eggs)", price: 120, isVeg: false, image: "/dishes/boil-tikka.avif" },
+  { id: 208, category: "Egg Specials", name: "Boil Bhurji (2 Eggs)", price: 140, isVeg: false, image: "/dishes/boil-bhurji.avif" },
+  { id: 205, category: "Egg Specials", name: "Egg Pulao", price: 140, isVeg: false, image: "/dishes/egg-pulao.avif" },
+  { id: 206, category: "Egg Specials", name: "Boil Tikka Masala (2 Eggs)", price: 140, isVeg: false, image: "/dishes/boil-tikka.avif" },
   { id: 207, category: "Egg Specials", name: "Egg Curry (2 Eggs)", price: 160, isVeg: false, image: "/dishes/egg-curry.avif" },
 
   // --- THALI ---
@@ -43,11 +43,11 @@ const MENU_ITEMS = [
   { id: 503, category: "Lunch Specials (Thali)", name: "Fish Thali", price: 200, isVeg: false, image: "/dishes/fish-thali.jpg", isLunchOnly: true },
 
   // --- MAIN COURSE ---
-  { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 120, variants: [{ name: "Half", price: 120, desc: "2 thigh pc, thin gravy" }, { name: "Full", price: 220, desc: "1 leg, 2 thigh, thin gravy" }] },
-  { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 180, variants: [{ name: "Half", price: 180, desc: "2 thigh, thick gravy" }, { name: "Full", price: 300, desc: "1 leg, 2 thigh, thick gravy" }] },
+  { id: 301, category: "Main Course", name: "Chicken Masala", isVeg: false, image: "/dishes/chicken-masala.avif", price: 130, variants: [{ name: "Half", price: 130, desc: "2 thigh pc, thin gravy" }, { name: "Full", price: 250, desc: "2 leg, 2 thigh, thin gravy" }] },
+  { id: 303, category: "Main Course", name: "Sp. Chicken Masala (Thick Gravy)", isVeg: false, image: "/dishes/sp-chicken.avif", price: 180, variants: [{ name: "Half", price: 180, desc: "2 thigh, thick gravy" }, { name: "Full", price: 320, desc: "2 leg, 2 thigh, thick gravy" }] },
   { id: 305, category: "Main Course", name: "Butter Chicken", price: 300, isVeg: false, image: "/dishes/butter-chicken.avif", description: "6 pc boneless, gravy" },
   { id: 306, category: "Main Course", name: "Fish Masala", price: 200, isVeg: false, image: "/dishes/fish-masala.avif", description: "2 pc, gravy" },
-  { id: 307, category: "Main Course", name: "Prawns Masala", price: 300, isVeg: false, image: "/dishes/prawns-masala.avif", description: "12 pc, gravy" },
+  { id: 307, category: "Main Course", name: "Prawns Masala", price: 320, isVeg: false, image: "/dishes/prawns-masala.avif", description: "12 pc, gravy" },
   { id: 308, category: "Main Course", name: "Mutton Kheema", isVeg: false, image: "/dishes/mutton-kheema.avif", price: 280, variants: [{ name: "Half", price: 280 }, { name: "Full", price: 400 }] },
   { id: 310, category: "Main Course", name: "Mutton Masala", isVeg: false, image: "/dishes/mutton-masala.avif", price: 300, variants: [{ name: "Half", price: 300, desc: "3 pc, gravy" }, { name: "Full", price: 450, desc: "6 pc, gravy" }] },
 
