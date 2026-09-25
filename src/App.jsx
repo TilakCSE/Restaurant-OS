@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc, where, increment, limit, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, query, orderBy, serverTimestamp, deleteDoc, where, increment, getDocs } from 'firebase/firestore';
 import { ShoppingCart, ChefHat, Plus, Minus, CheckCircle, Clock, ArrowLeft, UtensilsCrossed, IndianRupee, Store, Lock, QrCode, Package, LogOut, ClipboardList, Receipt, Utensils, AlertTriangle, Ban, Info, Power, Trash2, Edit, X, XCircle, TrendingUp, DollarSign, BarChart3, Search, Moon, Sun, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as XLSX from 'xlsx';
 
 // --- FIREBASE CONFIG ---
 const firebaseConfig = {
@@ -272,154 +273,1466 @@ const KitchenDisplay = ({ activeOrders, updateOrderStatus, deleteOrder, deleteIt
   );
 };
 
-const ReportView = ({ activeOrders, setView }) => {
-    const [filter, setFilter] = useState('today'); 
-    const [stats, setStats] = useState({ revenue: 0, orderCount: 0, itemsSold: 0 });
-    const [filteredOrders, setFilteredOrders] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+// ---------------------------------------------------------
+// BILL RECONSTRUCTION
+// Reconstructs physical/customer bills from individual
+// Firebase order tickets without changing the database.
+// ---------------------------------------------------------
 
-    // Calculate pending value from the active orders already loaded in the kitchen
-    const pendingValue = activeOrders?.reduce((sum, order) => sum + order.totalAmount, 0) || 0;
+const BILL_RECONSTRUCTION = {
+    // Used only as a supporting signal, NOT as a hard cutoff.
+    maxLikelyGapMinutes: 45,
 
-    useEffect(() => {
-        const fetchAnalytics = async () => {
-            setIsLoading(true);
-            let rev = 0; let count = 0; let sold = 0;
-            const datesToFetch = [];
-            const now = new Date();
-            
-            const getLocalDateStr = (d) => {
-                const offset = d.getTimezoneOffset() * 60000;
-                return (new Date(d.getTime() - offset)).toISOString().split('T')[0];
-            };
+    // An order with at least this many main-course line items
+    // is a strong candidate for a new customer's initial order.
+    strongMainCourseLines: 2,
 
-            // Determine how many daily stat documents we need to fetch
-            const days = filter === 'today' ? 1 : (filter === 'week' ? 7 : 30);
-            for(let i=0; i<days; i++) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                datesToFetch.push(getLocalDateStr(d));
+    // Large order amount by itself is not enough to start
+    // a new bill, but contributes to the confidence score.
+    largeOrderAmount: 600
+};
+
+const getOrderDate = (order) => {
+    if (!order?.createdAt) return null;
+
+    if (typeof order.createdAt.toDate === 'function') {
+        return order.createdAt.toDate();
+    }
+
+    if (order.createdAt.seconds) {
+        return new Date(order.createdAt.seconds * 1000);
+    }
+
+    const date = new Date(order.createdAt);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getOrderItems = (order) => {
+    return Array.isArray(order?.items) ? order.items : [];
+};
+
+const getOrderItemCount = (order) => {
+    return getOrderItems(order).reduce(
+        (sum, item) => sum + (Number(item.qty) || 0),
+        0
+    );
+};
+
+const getMainCourseInfo = (order) => {
+    const items = getOrderItems(order);
+
+    let lineCount = 0;
+    let quantity = 0;
+    let value = 0;
+
+    items.forEach(item => {
+        if (item.category === "Main Course") {
+            lineCount += 1;
+            quantity += Number(item.qty) || 0;
+
+            value +=
+                (Number(item.price) || 0) *
+                (Number(item.qty) || 0);
+        }
+    });
+
+    return {
+        lineCount,
+        quantity,
+        value
+    };
+};
+
+const isParcelTable = (tableNo) => {
+    return String(tableNo || "")
+        .toUpperCase()
+        .startsWith("PARCEL-");
+};
+
+/*
+ * Determines how strongly an order looks like a NEW CUSTOMER'S
+ * initial/anchor order.
+ *
+ * Higher score = stronger evidence that a new bill has started.
+ */
+const getAnchorScore = (order) => {
+    const amount = Number(order?.totalAmount) || 0;
+    const items = getOrderItems(order);
+    const itemCount = getOrderItemCount(order);
+
+    const mainCourse = getMainCourseInfo(order);
+
+    let score = 0;
+
+    // Multiple main-course lines is the strongest signal.
+    if (
+        mainCourse.lineCount >=
+        BILL_RECONSTRUCTION.strongMainCourseLines
+    ) {
+        score += 5;
+    }
+
+    // Multiple main-course quantities is also strong.
+    if (mainCourse.quantity >= 3) {
+        score += 3;
+    }
+
+    // Meaningful main-course value.
+    if (mainCourse.value >= 450) {
+        score += 3;
+    } else if (mainCourse.value >= 250) {
+        score += 1;
+    }
+
+    // Large overall order.
+    if (
+        amount >=
+        BILL_RECONSTRUCTION.largeOrderAmount
+    ) {
+        score += 2;
+    } else if (amount >= 400) {
+        score += 1;
+    }
+
+    // Several items indicate a more substantial initial order.
+    if (itemCount >= 4) {
+        score += 1;
+    }
+
+    return score;
+};
+
+const isLikelyNewBill = (
+    order,
+    currentBill,
+    previousOrder
+) => {
+    // A unique parcel identifier is already effectively
+    // a customer/session identifier.
+    if (isParcelTable(order.tableNo)) {
+        return true;
+    }
+
+    if (!currentBill || currentBill.orders.length === 0) {
+        return true;
+    }
+
+    const currentAnchor = currentBill.orders[0];
+
+    const newOrderAmount =
+        Number(order.totalAmount) || 0;
+
+    const anchorAmount =
+        Number(currentAnchor.totalAmount) || 0;
+
+    const anchorScore = getAnchorScore(order);
+
+    const mainCourse = getMainCourseInfo(order);
+
+    const previousDate = getOrderDate(previousOrder);
+    const currentDate = getOrderDate(order);
+
+    const gapMinutes =
+        previousDate && currentDate
+            ? (currentDate.getTime() -
+                previousDate.getTime()) /
+              60000
+            : 0;
+
+    /*
+     * RULE 1:
+     *
+     * A new order containing multiple substantial
+     * main-course lines is the strongest indication
+     * of a new customer.
+     */
+    if (
+        mainCourse.lineCount >= 2 &&
+        anchorScore >= 5
+    ) {
+        return true;
+    }
+
+    /*
+     * RULE 2:
+     *
+     * A large order with multiple main-course quantities
+     * after an already established bill is another
+     * strong new-customer signal.
+     */
+    if (
+        newOrderAmount >= 600 &&
+        mainCourse.quantity >= 3 &&
+        currentBill.orders.length >= 1
+    ) {
+        return true;
+    }
+
+    /*
+     * RULE 3:
+     *
+     * If the new order is very substantial relative to
+     * the original anchor AND has strong composition,
+     * treat it as a possible new bill.
+     *
+     * We deliberately don't split on amount alone.
+     */
+    if (
+        currentBill.orders.length >= 2 &&
+        anchorAmount > 0 &&
+        newOrderAmount >= anchorAmount * 0.75 &&
+        anchorScore >= 5
+    ) {
+        return true;
+    }
+
+    /*
+     * RULE 4:
+     *
+     * A long inactivity gap is only a supporting signal.
+     *
+     * It can split a bill when the next order itself
+     * looks substantial, but it cannot split a small
+     * add-on such as water/roti/rice.
+     */
+    if (
+        gapMinutes > BILL_RECONSTRUCTION.maxLikelyGapMinutes &&
+        anchorScore >= 4
+    ) {
+        return true;
+    }
+
+    /*
+     * Otherwise, treat the order as an add-on.
+     */
+    return false;
+};
+
+const mergeBillItems = (orders) => {
+    const itemMap = new Map();
+
+    orders.forEach(order => {
+        getOrderItems(order).forEach(item => {
+
+            /*
+             * Use name + variant as the identity.
+             *
+             * Example:
+             * Chicken Tikka + Half
+             * Chicken Tikka + Full
+             *
+             * remain separate.
+             */
+            const key = [
+                item.id,
+                item.name,
+                item.variant || ""
+            ].join("::");
+
+            if (!itemMap.has(key)) {
+                itemMap.set(key, {
+                    id: item.id,
+                    name: item.name,
+                    variant: item.variant || "",
+                    category: item.category || "",
+                    price: Number(item.price) || 0,
+                    qty: 0
+                });
             }
+
+            const existing = itemMap.get(key);
+
+            existing.qty += Number(item.qty) || 0;
+        });
+    });
+
+    return Array.from(itemMap.values());
+};
+
+const createReconstructedBill = (
+    tableNo,
+    orders,
+    billNumber
+) => {
+    const sortedOrders = [...orders].sort((a, b) => {
+        const aDate = getOrderDate(a)?.getTime() || 0;
+        const bDate = getOrderDate(b)?.getTime() || 0;
+
+        return aDate - bDate;
+    });
+
+    const startDate = getOrderDate(sortedOrders[0]);
+    const endDate = getOrderDate(
+        sortedOrders[sortedOrders.length - 1]
+    );
+
+    const totalAmount = sortedOrders.reduce(
+        (sum, order) =>
+            sum + (Number(order.totalAmount) || 0),
+        0
+    );
+
+    return {
+        billNumber,
+        tableNo,
+
+        startDate,
+        endDate,
+
+        orders: sortedOrders,
+
+        orderCount: sortedOrders.length,
+
+        itemCount: sortedOrders.reduce(
+            (sum, order) =>
+                sum + getOrderItemCount(order),
+            0
+        ),
+
+        totalAmount,
+
+        items: mergeBillItems(sortedOrders),
+
+        orderIds: sortedOrders.map(order => order.id)
+    };
+};
+
+/*
+ * Main reconstruction function.
+ */
+const groupOrdersIntoBills = (paidOrders) => {
+    /*
+     * First group all paid tickets by table.
+     */
+    const tableGroups = {};
+
+    paidOrders.forEach(order => {
+        const table = order.tableNo || "UNKNOWN";
+
+        if (!tableGroups[table]) {
+            tableGroups[table] = [];
+        }
+
+        tableGroups[table].push(order);
+    });
+
+    const reconstructedBills = [];
+
+    /*
+     * Process every table independently.
+     */
+    Object.entries(tableGroups).forEach(
+        ([tableNo, orders]) => {
+
+            const sortedOrders = [...orders].sort(
+                (a, b) => {
+                    const aTime =
+                        getOrderDate(a)?.getTime() || 0;
+
+                    const bTime =
+                        getOrderDate(b)?.getTime() || 0;
+
+                    return aTime - bTime;
+                }
+            );
+
+            let currentBill = null;
+
+            sortedOrders.forEach(order => {
+
+                const previousOrder =
+                    currentBill?.orders[
+                        currentBill.orders.length - 1
+                    ] || null;
+
+                const shouldStartNewBill =
+                    !currentBill ||
+                    isLikelyNewBill(
+                        order,
+                        currentBill,
+                        previousOrder
+                    );
+
+                if (shouldStartNewBill) {
+
+                    if (currentBill) {
+                        reconstructedBills.push(
+                            currentBill
+                        );
+                    }
+
+                    currentBill = {
+                        tableNo,
+                        orders: [order]
+                    };
+
+                } else {
+
+                    currentBill.orders.push(order);
+                }
+            });
+
+            if (currentBill) {
+                reconstructedBills.push(currentBill);
+            }
+        }
+    );
+
+    /*
+     * Convert temporary groups into proper bill objects.
+     */
+    const sortedBills = reconstructedBills.sort(
+        (a, b) => {
+            const aTime =
+                getOrderDate(a.orders[0])?.getTime() || 0;
+
+            const bTime =
+                getOrderDate(b.orders[0])?.getTime() || 0;
+
+            return aTime - bTime;
+        }
+    );
+
+    return sortedBills.map((bill, index) =>
+        createReconstructedBill(
+            bill.tableNo,
+            bill.orders,
+            index + 1
+        )
+    );
+};
+
+const ReportView = ({ activeOrders, setView }) => {
+
+    const getTodayIST = () => {
+        return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Kolkata"
+        }).format(new Date());
+    };
+
+    const [selectedDate, setSelectedDate] =
+        useState(getTodayIST());
+
+    const [dailyStats, setDailyStats] = useState({
+        revenue: 0,
+        orderCount: 0,
+        itemsSold: 0
+    });
+
+    const [paidOrders, setPaidOrders] = useState([]);
+
+    const [reconstructedBills, setReconstructedBills] =
+        useState([]);
+
+    const [isLoading, setIsLoading] =
+        useState(false);
+
+    const [isExporting, setIsExporting] =
+        useState(false);
+
+    const [error, setError] =
+        useState("");
+
+    const pendingValue =
+        activeOrders?.reduce(
+            (sum, order) =>
+                sum + (Number(order.totalAmount) || 0),
+            0
+        ) || 0;
+
+
+    const formatDate = (date) => {
+        if (!date) return "-";
+
+        return new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        }).format(date);
+    };
+
+
+    const formatTime = (date) => {
+        if (!date) return "-";
+
+        return new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        }).format(date);
+    };
+
+
+    const formatItems = (items = []) => {
+        return items
+            .map(item => {
+
+                const variant =
+                    item.variant
+                        ? ` (${item.variant})`
+                        : "";
+
+                return `${item.name}${variant} x${item.qty}`;
+            })
+            .join(", ");
+    };
+
+
+    /*
+     * Fetch paid orders for exactly one selected date.
+     */
+    useEffect(() => {
+
+        const fetchDailyReport = async () => {
+
+            if (!selectedDate) return;
+
+            setIsLoading(true);
+            setError("");
 
             try {
-                // 1. Fetch exactly 1 to 30 documents for the stats (Ultra optimized reads)
-                await Promise.all(datesToFetch.map(async (dateStr) => {
-                    const snap = await getDoc(doc(db, "daily_stats", dateStr));
-                    if(snap.exists()) {
-                        const data = snap.data();
-                        rev += (data.revenue || 0);
-                        count += (data.orderCount || 0);
-                        sold += (data.itemsSold || 0);
-                    }
-                }));
-                setStats({ revenue: rev, orderCount: count, itemsSold: sold });
 
-                // 2. Fetch the latest 50 settled bills for the history table
-                // By capping it at limit(50), we guarantee this screen never exceeds 80 reads!
-                const historyQuery = query(
-                    collection(db, "orders"), 
-                    where("status", "==", "paid"), 
-                    orderBy("createdAt", "desc"), 
-                    limit(50)
+                /*
+                 * Explicit IST boundaries.
+                 */
+                const startOfDay =
+                    new Date(
+                        `${selectedDate}T00:00:00+05:30`
+                    );
+
+                const startOfNextDay =
+                    new Date(
+                        startOfDay.getTime() +
+                        24 * 60 * 60 * 1000
+                    );
+
+
+                /*
+                 * Query by createdAt only.
+                 *
+                 * We intentionally do NOT put
+                 * status == paid into the Firestore query.
+                 *
+                 * This avoids creating another composite index.
+                 */
+                const ordersQuery = query(
+                    collection(db, "orders"),
+
+                    where(
+                        "createdAt",
+                        ">=",
+                        startOfDay
+                    ),
+
+                    where(
+                        "createdAt",
+                        "<",
+                        startOfNextDay
+                    ),
+
+                    orderBy(
+                        "createdAt",
+                        "asc"
+                    )
                 );
-                const historySnap = await getDocs(historyQuery);
-                setFilteredOrders(historySnap.docs.map(d => ({id: d.id, ...d.data()})));
-                
+
+
+                const ordersSnapshot =
+                    await getDocs(ordersQuery);
+
+
+                const allDayOrders =
+                    ordersSnapshot.docs.map(
+                        snapshot => ({
+                            id: snapshot.id,
+                            ...snapshot.data()
+                        })
+                    );
+
+
+                /*
+                 * Only settled/paid orders participate
+                 * in the historical report.
+                 */
+                const settledOrders =
+                    allDayOrders.filter(
+                        order =>
+                            order.status === "paid"
+                    );
+
+
+                /*
+                 * Existing daily_stats document.
+                 */
+                const statsSnapshot =
+                    await getDoc(
+                        doc(
+                            db,
+                            "daily_stats",
+                            selectedDate
+                        )
+                    );
+
+
+                const stats =
+                    statsSnapshot.exists()
+                        ? statsSnapshot.data()
+                        : {
+                            revenue: 0,
+                            orderCount: 0,
+                            itemsSold: 0
+                        };
+
+
+                /*
+                 * THE IMPORTANT PART:
+                 *
+                 * Individual Firebase tickets
+                 * become reconstructed physical bills.
+                 */
+                const bills =
+                    groupOrdersIntoBills(
+                        settledOrders
+                    );
+
+
+                setPaidOrders(
+                    settledOrders
+                );
+
+                setReconstructedBills(
+                    bills
+                );
+
+                setDailyStats({
+                    revenue:
+                        Number(stats.revenue) || 0,
+
+                    orderCount:
+                        Number(stats.orderCount) || 0,
+
+                    itemsSold:
+                        Number(stats.itemsSold) || 0
+                });
+
+
             } catch (e) {
-                console.error("Error fetching analytics:", e);
+
+                console.error(
+                    "Error fetching daily report:",
+                    e
+                );
+
+                setError(
+                    "Could not load the daily report."
+                );
+
+                setPaidOrders([]);
+                setReconstructedBills([]);
             }
+
             setIsLoading(false);
         };
 
-        fetchAnalytics();
-    }, [filter]);
+
+        fetchDailyReport();
+
+    }, [selectedDate]);
+
+
+    /*
+     * Calculated values from the raw paid tickets.
+     */
+    const calculatedRevenue =
+        paidOrders.reduce(
+            (sum, order) =>
+                sum +
+                (Number(order.totalAmount) || 0),
+            0
+        );
+
+
+    const calculatedItems =
+        paidOrders.reduce(
+            (sum, order) =>
+                sum +
+                getOrderItemCount(order),
+            0
+        );
+
+
+    /*
+     * ------------------------------------------------------
+     * EXCEL EXPORT
+     * ------------------------------------------------------
+     */
+    const exportExcel = () => {
+
+        if (
+            reconstructedBills.length === 0
+        ) {
+            alert(
+                "There are no paid bills for this date."
+            );
+
+            return;
+        }
+
+        setIsExporting(true);
+
+        try {
+
+            /*
+             * SHEET 1
+             *
+             * Reconstructed physical/customer bills.
+             */
+            const billRows =
+                reconstructedBills.map(
+                    bill => ({
+
+                        "Bill #":
+                            bill.billNumber,
+
+                        "Date":
+                            formatDate(
+                                bill.startDate
+                            ),
+
+                        "Table":
+                            bill.tableNo,
+
+                        "Start Time":
+                            formatTime(
+                                bill.startDate
+                            ),
+
+                        "Last Order":
+                            formatTime(
+                                bill.endDate
+                            ),
+
+                        "Tickets":
+                            bill.orderCount,
+
+                        "Items":
+                            bill.itemCount,
+
+                        "Bill Items":
+                            formatItems(
+                                bill.items
+                            ),
+
+                        "Total (₹)":
+                            bill.totalAmount
+                    })
+                );
+
+
+            const billSheet =
+                XLSX.utils.json_to_sheet(
+                    billRows
+                );
+
+
+            billSheet["!cols"] = [
+                { wch: 8 },
+                { wch: 13 },
+                { wch: 18 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 10 },
+                { wch: 10 },
+                { wch: 80 },
+                { wch: 15 }
+            ];
+
+
+            /*
+             * SHEET 2
+             *
+             * Raw Firebase tickets.
+             *
+             * This lets us audit how a reconstructed
+             * bill was created.
+             */
+            const rawRows =
+                paidOrders.map(
+                    (order, index) => {
+
+                        const date =
+                            getOrderDate(
+                                order
+                            );
+
+                        return {
+
+                            "#":
+                                index + 1,
+
+                            "Date":
+                                formatDate(
+                                    date
+                                ),
+
+                            "Timestamp":
+                                formatTime(
+                                    date
+                                ),
+
+                            "Table":
+                                order.tableNo || "-",
+
+                            "Firebase Order ID":
+                                order.id,
+
+                            "Items":
+                                formatItems(
+                                    order.items
+                                ),
+
+                            "Items Count":
+                                getOrderItemCount(
+                                    order
+                                ),
+
+                            "Amount (₹)":
+                                Number(
+                                    order.totalAmount
+                                ) || 0,
+
+                            "Status":
+                                order.status || "-"
+                        };
+                    }
+                );
+
+
+            const rawSheet =
+                XLSX.utils.json_to_sheet(
+                    rawRows
+                );
+
+
+            rawSheet["!cols"] = [
+                { wch: 5 },
+                { wch: 13 },
+                { wch: 14 },
+                { wch: 18 },
+                { wch: 26 },
+                { wch: 70 },
+                { wch: 12 },
+                { wch: 15 },
+                { wch: 12 }
+            ];
+
+
+            /*
+             * SHEET 3
+             *
+             * Table-level summary.
+             */
+            const tableMap = {};
+
+
+            reconstructedBills.forEach(
+                bill => {
+
+                    const table =
+                        bill.tableNo || "UNKNOWN";
+
+
+                    if (!tableMap[table]) {
+
+                        tableMap[table] = {
+
+                            table,
+
+                            bills: 0,
+
+                            tickets: 0,
+
+                            items: 0,
+
+                            revenue: 0
+                        };
+                    }
+
+
+                    tableMap[table].bills += 1;
+
+                    tableMap[table].tickets +=
+                        bill.orderCount;
+
+                    tableMap[table].items +=
+                        bill.itemCount;
+
+                    tableMap[table].revenue +=
+                        bill.totalAmount;
+                }
+            );
+
+
+            const tableRows =
+                Object.values(tableMap)
+                    .sort(
+                        (a, b) =>
+                            String(a.table)
+                                .localeCompare(
+                                    String(b.table),
+                                    undefined,
+                                    {
+                                        numeric: true
+                                    }
+                                )
+                    )
+                    .map(
+                        (row, index) => ({
+
+                            "#":
+                                index + 1,
+
+                            "Table":
+                                row.table,
+
+                            "Bills":
+                                row.bills,
+
+                            "Tickets":
+                                row.tickets,
+
+                            "Items Sold":
+                                row.items,
+
+                            "Revenue (₹)":
+                                row.revenue
+                        })
+                    );
+
+
+            const tableSheet =
+                XLSX.utils.json_to_sheet(
+                    tableRows
+                );
+
+
+            tableSheet["!cols"] = [
+                { wch: 5 },
+                { wch: 18 },
+                { wch: 10 },
+                { wch: 12 },
+                { wch: 14 },
+                { wch: 18 }
+            ];
+
+
+            /*
+             * SHEET 4
+             *
+             * Validation against daily_stats.
+             */
+            const summaryRows = [
+
+                {
+                    "Metric":
+                        "Reconstructed Bills",
+
+                    "Value":
+                        reconstructedBills.length
+                },
+
+                {
+                    "Metric":
+                        "Firebase Paid Tickets",
+
+                    "Value":
+                        paidOrders.length
+                },
+
+                {
+                    "Metric":
+                        "Calculated Revenue",
+
+                    "Value":
+                        calculatedRevenue
+                },
+
+                {
+                    "Metric":
+                        "daily_stats Revenue",
+
+                    "Value":
+                        dailyStats.revenue
+                },
+
+                {
+                    "Metric":
+                        "Revenue Difference",
+
+                    "Value":
+                        calculatedRevenue -
+                        dailyStats.revenue
+                },
+
+                {
+                    "Metric":
+                        "Calculated Items Sold",
+
+                    "Value":
+                        calculatedItems
+                },
+
+                {
+                    "Metric":
+                        "daily_stats Items Sold",
+
+                    "Value":
+                        dailyStats.itemsSold
+                },
+
+                {
+                    "Metric":
+                        "Items Difference",
+
+                    "Value":
+                        calculatedItems -
+                        dailyStats.itemsSold
+                },
+
+                {
+                    "Metric":
+                        "daily_stats Order Count",
+
+                    "Value":
+                        dailyStats.orderCount
+                },
+
+                {
+                    "Metric":
+                        "Ticket Count Difference",
+
+                    "Value":
+                        paidOrders.length -
+                        dailyStats.orderCount
+                }
+            ];
+
+
+            const summarySheet =
+                XLSX.utils.json_to_sheet(
+                    summaryRows
+                );
+
+
+            summarySheet["!cols"] = [
+                { wch: 35 },
+                { wch: 20 }
+            ];
+
+
+            /*
+             * Build workbook.
+             */
+            const workbook =
+                XLSX.utils.book_new();
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                billSheet,
+                "Bills"
+            );
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                rawSheet,
+                "Raw Tickets"
+            );
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                tableSheet,
+                "Table Summary"
+            );
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                summarySheet,
+                "Validation"
+            );
+
+
+            /*
+             * Generate file.
+             */
+            XLSX.writeFile(
+                workbook,
+                `PCs-Kitchen-Bills-${selectedDate}.xlsx`
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Excel export failed:",
+                error
+            );
+
+            alert(
+                "Failed to generate Excel report."
+            );
+
+        } finally {
+
+            setIsExporting(false);
+        }
+    };
+
 
     return (
-        <div className="max-w-4xl mx-auto p-4 pb-24">
+        <div className="max-w-6xl mx-auto p-4 pb-24">
+
+            {/* HEADER */}
+
             <div className="flex items-center gap-4 mb-6">
-                <button onClick={() => setView('staff-dashboard')} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition"><ArrowLeft size={20}/></button>
+
+                <button
+                    onClick={() =>
+                        setView("staff-dashboard")
+                    }
+                    className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"
+                >
+                    <ArrowLeft size={20}/>
+                </button>
+
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><TrendingUp className="text-purple-600"/> Analytics Dashboard</h2>
-                    <p className="text-sm text-gray-500">Track revenue and order history</p>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <TrendingUp
+                            className="text-purple-600"
+                        />
+
+                        Daily Bill Report
+                    </h2>
+
+                    <p className="text-sm text-gray-500">
+                        Reconstructed from settled order tickets
+                    </p>
                 </div>
+
             </div>
 
-            <div className="flex bg-gray-200 p-1 rounded-lg mb-6">
-                {['today', 'week', 'month'].map(f => (
-                    <button 
-                        key={f} 
-                        onClick={() => setFilter(f)} 
-                        className={`flex-1 py-2 text-sm font-bold rounded-md capitalize transition ${filter === f ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
-                    >
-                        {f}
-                    </button>
-                ))}
-            </div>
 
-            {isLoading ? (
-                <div className="text-center py-10 font-bold text-gray-500 animate-pulse">Calculating Secure Revenue...</div>
-            ) : (
-                <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md">
-                            <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1 flex items-center gap-1"><DollarSign size={14}/> Settled Revenue</p>
-                            <h3 className="text-3xl font-extrabold">₹{stats.revenue}</h3>
-                        </div>
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><BarChart3 size={14}/> Total Orders</p>
-                            <h3 className="text-2xl font-extrabold text-gray-800">{stats.orderCount}</h3>
-                        </div>
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Package size={14}/> Items Sold</p>
-                            <h3 className="text-2xl font-extrabold text-gray-800">{stats.itemsSold}</h3>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-xl shadow-sm border border-orange-200">
-                            <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={14}/> Pending Value</p>
-                            <h3 className="text-2xl font-extrabold text-orange-800">₹{pendingValue}</h3>
-                            <p className="text-[10px] text-orange-600 mt-1">From active tables</p>
-                        </div>
+            {/* DATE + EXPORT */}
+
+            <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
+
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+
+                    <div>
+
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                            Report Date
+                        </label>
+
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={e =>
+                                setSelectedDate(
+                                    e.target.value
+                                )
+                            }
+                            className="border-2 border-gray-200 rounded-lg px-4 py-2 font-bold"
+                        />
+
                     </div>
 
-                    <h3 className="font-bold text-lg text-gray-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt size={18}/> Latest Settled Bills</h3>
-                    
-                    {filteredOrders.length === 0 ? (
-                        <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-400 border border-dashed border-gray-200">
-                            No settled bills found.
+
+                    <button
+                        onClick={exportExcel}
+                        disabled={
+                            isExporting ||
+                            reconstructedBills.length === 0
+                        }
+                        className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                    >
+
+                        <Receipt size={18}/>
+
+                        {isExporting
+                            ? "Generating..."
+                            : "Export Excel"
+                        }
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">
+                    {error}
+                </div>
+            )}
+
+
+            {isLoading ? (
+
+                <div className="text-center py-16 font-bold text-gray-500 animate-pulse">
+                    Reconstructing bills...
+                </div>
+
+            ) : (
+
+                <>
+
+                    {/* SUMMARY */}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+
+                        <div className="bg-purple-600 text-white p-4 rounded-xl">
+                            <p className="text-xs font-bold uppercase opacity-80">
+                                Revenue
+                            </p>
+
+                            <h3 className="text-3xl font-extrabold">
+                                ₹{calculatedRevenue}
+                            </h3>
                         </div>
-                    ) : (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-100 text-gray-600 text-sm">
-                                            <th className="p-3 border-b">Time</th>
-                                            <th className="p-3 border-b">Order ID</th>
-                                            <th className="p-3 border-b">Table</th>
-                                            <th className="p-3 border-b">Items</th>
-                                            <th className="p-3 border-b text-right">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredOrders.map(order => (
-                                            <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50 transition">
-                                                <td className="p-3 text-sm text-gray-600">
-                                                    {order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : '-'}
-                                                </td>
-                                                <td className="p-3 font-mono text-xs text-gray-500">#{order.id.slice(-5)}</td>
-                                                <td className="p-3 font-bold text-gray-800">{order.tableNo}</td>
-                                                <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">
-                                                    {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-                                                </td>
-                                                <td className="p-3 font-bold text-green-700 text-right">₹{order.totalAmount}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+
+
+                        <div className="bg-white p-4 rounded-xl border">
+                            <p className="text-xs font-bold text-gray-500 uppercase">
+                                Reconstructed Bills
+                            </p>
+
+                            <h3 className="text-3xl font-extrabold">
+                                {reconstructedBills.length}
+                            </h3>
+                        </div>
+
+
+                        <div className="bg-white p-4 rounded-xl border">
+                            <p className="text-xs font-bold text-gray-500 uppercase">
+                                Firebase Tickets
+                            </p>
+
+                            <h3 className="text-3xl font-extrabold">
+                                {paidOrders.length}
+                            </h3>
+                        </div>
+
+
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                            <p className="text-xs font-bold text-orange-600 uppercase">
+                                Pending Value
+                            </p>
+
+                            <h3 className="text-2xl font-extrabold text-orange-800">
+                                ₹{pendingValue}
+                            </h3>
+                        </div>
+
+                    </div>
+
+
+                    {/* BILLS */}
+
+                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+
+                        <div className="p-4 border-b">
+
+                            <h3 className="font-bold text-lg">
+                                Reconstructed Bills
+                            </h3>
+
+                            <p className="text-xs text-gray-500 mt-1">
+                                Tickets are grouped using order sequence,
+                                item composition and amount patterns.
+                            </p>
+
+                        </div>
+
+
+                        {reconstructedBills.length === 0 ? (
+
+                            <div className="text-center py-12 text-gray-400">
+                                No settled bills found.
                             </div>
+
+                        ) : (
+
+                            <div className="divide-y">
+
+                                {reconstructedBills.map(
+                                    bill => (
+
+                                        <div
+                                            key={`${bill.tableNo}-${bill.billNumber}`}
+                                            className="p-5 hover:bg-gray-50"
+                                        >
+
+                                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+                                                <div>
+
+                                                    <div className="flex items-center gap-3">
+
+                                                        <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-bold">
+                                                            BILL #{bill.billNumber}
+                                                        </span>
+
+                                                        <span className="font-bold text-gray-800">
+                                                            Table {bill.tableNo}
+                                                        </span>
+
+                                                    </div>
+
+
+                                                    <p className="text-xs text-gray-500 mt-2">
+
+                                                        {formatTime(
+                                                            bill.startDate
+                                                        )}
+
+                                                        {" → "}
+
+                                                        {formatTime(
+                                                            bill.endDate
+                                                        )}
+
+                                                        {" • "}
+
+                                                        {bill.orderCount}
+                                                        {" ticket"}
+
+                                                        {bill.orderCount !== 1
+                                                            ? "s"
+                                                            : ""
+                                                        }
+
+                                                    </p>
+
+                                                </div>
+
+
+                                                <div className="text-right">
+
+                                                    <p className="text-2xl font-extrabold text-green-700">
+                                                        ₹{bill.totalAmount}
+                                                    </p>
+
+                                                </div>
+
+                                            </div>
+
+
+                                            <div className="mt-4 bg-gray-50 rounded-lg p-3">
+
+                                                <p className="text-xs font-bold text-gray-500 uppercase mb-2">
+                                                    Combined Items
+                                                </p>
+
+                                                <p className="text-sm text-gray-700">
+                                                    {formatItems(
+                                                        bill.items
+                                                    )}
+                                                </p>
+
+                                            </div>
+
+
+                                            <div className="mt-2">
+
+                                                <p className="text-[11px] text-gray-400">
+                                                    Firebase tickets:{" "}
+                                                    {bill.orderIds.join(", ")}
+                                                </p>
+
+                                            </div>
+
+                                        </div>
+
+                                    )
+                                )}
+
+                            </div>
+
+                        )}
+
+                    </div>
+
+
+                    {/* VALIDATION */}
+
+                    <div className="mt-6 bg-gray-50 rounded-xl border p-5">
+
+                        <h3 className="font-bold mb-4">
+                            Data Validation
+                        </h3>
+
+                        <div className="grid md:grid-cols-3 gap-4 text-sm">
+
+                            <div>
+                                <p className="text-gray-500">
+                                    Report Revenue
+                                </p>
+
+                                <p className="font-bold">
+                                    ₹{calculatedRevenue}
+                                </p>
+
+                                <p className="text-xs text-gray-400">
+                                    daily_stats: ₹{dailyStats.revenue}
+                                </p>
+                            </div>
+
+
+                            <div>
+                                <p className="text-gray-500">
+                                    Firebase Tickets
+                                </p>
+
+                                <p className="font-bold">
+                                    {paidOrders.length}
+                                </p>
+
+                                <p className="text-xs text-gray-400">
+                                    daily_stats: {dailyStats.orderCount}
+                                </p>
+                            </div>
+
+
+                            <div>
+                                <p className="text-gray-500">
+                                    Items Sold
+                                </p>
+
+                                <p className="font-bold">
+                                    {calculatedItems}
+                                </p>
+
+                                <p className="text-xs text-gray-400">
+                                    daily_stats: {dailyStats.itemsSold}
+                                </p>
+                            </div>
+
                         </div>
-                    )}
+
+                    </div>
+
                 </>
             )}
+
         </div>
     );
 };
